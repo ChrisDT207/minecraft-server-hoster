@@ -1,0 +1,79 @@
+{
+  "name": "mc-forgedesk",
+  "version": "1.0.0",
+  "description": "Pragmatic Desktop Minecraft Server Manager & Hoster",
+  "main": "dist-electron/main.js",
+  "author": "MC-ForgeDesk Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "tsc -p electron/tsconfig.json && electron .",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "build": "vite build && tsc -p electron/tsconfig.json",
+    "prebuild:win": "tsc -p electron/tsconfig.json",
+    "build:win": "vite build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.mcforgedesk.app",
+    "productName": "MC-ForgeDesk",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/*.exe",
+      "!dist/*.blockmap",
+      "!dist/builder-effective-config.yaml",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MC-ForgeDesk"
+    }
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "adm-zip": "^0.5.16",
+    "lucide-react": "^1.16.0",
+    "pidusage": "^4.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/node": "^20.14.9",
+    "@types/pidusage": "^2.0.5",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "electron": "^31.0.2",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.2",
+    "vite": "^5.3.1"
+  }
+}
