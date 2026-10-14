@@ -1,4 +1,4 @@
-# MC-ForgeDesk 🎮⛏️
+# MC-ForgeDesk
 
 > **A modern, pragmatic desktop Minecraft Server Manager & Zero-Port-Forward Hoster for Windows.**
 
@@ -6,13 +6,13 @@ Built with **Electron**, **React 18**, **Vite**, **TypeScript**, and **Tailwind 
 
 ---
 
-## ✨ Features
+## Features
 
-- **🌐 Live Dynamic Provisioning (Zero Hardcoded Lists)**
+- **Live Dynamic Provisioning (Zero Hardcoded Lists)**
   - Queries official manifests on-the-fly for **Java Edition (Mojang)**, **PaperMC**, **Fabric**, **Forge**, **NeoForge**, and **Bedrock Dedicated Server (BDS)**.
   - Automatically downloads required server executables and sets up directory structures.
 
-- **☕ Automated Java Runtime Provisioning**
+- **Automated Java Runtime Provisioning**
   - Scans system directories (`PATH`, `JAVA_HOME`, Eclipse Adoptium, Microsoft OpenJDK, Android SDK OpenJDK, Zulu, etc.).
   - Accurately resolves bytecode requirements:
     - **Java 25**: Future snapshots (26.x+)
@@ -21,35 +21,35 @@ Built with **Electron**, **React 18**, **Vite**, **TypeScript**, and **Tailwind 
     - **Java 8**: Legacy MC (<= 1.16.5)
   - Automatically downloads and extracts portable **Eclipse Adoptium Temurin JREs** on demand if no compatible runtime is detected.
 
-- **🚀 Public Hosting with Playit.gg (No Router Port Forwarding)**
+- **Public Hosting with Playit.gg (No Router Port Forwarding)**
   - Bundles the official standalone Playit CLI agent (`v0.15.26`) with `--stdout` streaming.
   - Routes traffic through global encrypted Anycast relays, keeping your home IP and network completely shielded.
   - Provides a 1-click **Open Claim URL** banner and resolves public addresses (`*.joinmc.link` / `*.ply.gg`).
 
-- **👕 TLauncher & Offline Client Compatibility**
+- **TLauncher & Offline Client Compatibility**
   - Toggle offline mode (`online-mode=false`) with a single click.
   - Automatically provisions and installs **SkinRestorer** (via Modrinth) so players keep custom skins and capes in offline mode.
 
-- **💻 Interactive xterm.js Terminal & Stdin Console**
+- **Interactive xterm.js Terminal & Stdin Console**
   - Hardware-accelerated terminal with custom slate theme.
   - Full translation of Minecraft formatting codes (`§a`, `§c`, etc.) to ANSI colors.
   - Command input with history traversal (<kbd>↑</kbd> / <kbd>↓</kbd>) and quick action buttons (`/list`, `/time set day`, `/save-all`, etc.).
 
-- **🧩 Mod & Plugin Manager (Modrinth Integration)**
+- **Mod & Plugin Manager (Modrinth Integration)**
   - Search and 1-click install mods or plugins directly from the Modrinth API, filtered automatically by your server loader and game version.
   - Drag-and-drop support for local `.jar` or `.mcpack` files.
   - Enable/disable toggles (via `.disabled` extension renaming) and package deletion.
 
-- **⚙️ Server Configuration Editor**
+- **Server Configuration Editor**
   - Dual-mode editor: visual form controls for common settings (MOTD, PVP, Difficulty, Max Players, Spawn Protection) or raw text editor for full `server.properties` control.
 
-- **📊 Resource Monitoring & Safe Process Management**
+- **Resource Monitoring & Safe Process Management**
   - Real-time CPU, RAM usage, and active player tracking.
   - Clean `stdin` shutdown (`stop\n`) backed by an automated 30-second fallback watchdog to prevent frozen background processes.
 
 ---
 
-## 🏗️ Project Architecture
+## Project Architecture
 
 ```
 minecraft-server-hoster/
@@ -88,7 +88,7 @@ minecraft-server-hoster/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -135,7 +135,7 @@ This generates:
 
 ---
 
-## 🔍 How It Works Under the Hood
+## How It Works Under the Hood
 
 ### 1. Server Storage & Workspace Layout
 All server files, configurations, and downloaded runtimes are stored in the user profile directory to keep the application portable and isolated:
@@ -164,7 +164,7 @@ When launching a server:
 
 ---
 
-## 🛠️ Scripts Reference
+## Scripts Reference
 
 | Command | Action |
 | :--- | :--- |
@@ -175,6 +175,6 @@ When launching a server:
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
