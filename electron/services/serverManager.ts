@@ -223,6 +223,102 @@ export class ServerManager {
     return true;
   }
 
+  // 5b. Update server configuration (RAM, Port, Name, Java, JVM args, Offline mode)
+  public async updateServerConfig(
+    id: string,
+    updates: Partial<ServerConfig>
+  ): Promise<ServerConfig> {
+    const cfg = this.getServer(id);
+    if (!cfg) {
+      throw new Error(`Server with ID "${id}" not found.`);
+    }
+
+    const updatedMinRam = updates.minRam !== undefined ? Math.max(256, Math.round(updates.minRam)) : cfg.minRam;
+    const updatedMaxRam = updates.maxRam !== undefined ? Math.max(updatedMinRam, Math.round(updates.maxRam)) : cfg.maxRam;
+    const updatedPort = updates.port !== undefined ? Math.max(1024, Math.min(65535, Math.round(updates.port))) : cfg.port;
+
+    const updatedConfig: ServerConfig = {
+      ...cfg,
+      ...updates,
+      minRam: updatedMinRam,
+      maxRam: updatedMaxRam,
+      port: updatedPort,
+      id: cfg.id, // Immutable
+      serverDir: cfg.serverDir, // Immutable
+      createdAt: cfg.createdAt, // Immutable
+      edition: cfg.edition, // Immutable
+      loader: cfg.loader, // Immutable
+      version: cfg.version, // Immutable
+    };
+
+    // Save updated mcfg-server.json
+    const configPath = path.join(cfg.serverDir, 'mcfg-server.json');
+    fs.writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), 'utf8');
+
+    // Synchronize server.properties if relevant settings changed
+    const propsUpdates: Record<string, string> = {};
+    if (updates.port !== undefined) {
+      propsUpdates['server-port'] = String(updatedPort);
+      if (cfg.edition === 'bedrock') {
+        propsUpdates['server-portv6'] = String(updatedPort + 1);
+      }
+    }
+    if (updates.allowOffline !== undefined) {
+      propsUpdates['online-mode'] = updates.allowOffline ? 'false' : 'true';
+    }
+    if (updates.name !== undefined && updates.name.trim()) {
+      if (cfg.edition === 'bedrock') {
+        propsUpdates['server-name'] = updates.name.trim();
+      } else {
+        propsUpdates['motd'] = updates.name.trim();
+      }
+    }
+
+    if (Object.keys(propsUpdates).length > 0) {
+      this.saveServerProperties(id, propsUpdates);
+    }
+
+    // Modern Forge / NeoForge run.bat uses user_jvm_args.txt
+    const userJvmArgsPath = path.join(cfg.serverDir, 'user_jvm_args.txt');
+    if (fs.existsSync(userJvmArgsPath)) {
+      try {
+        let content = fs.readFileSync(userJvmArgsPath, 'utf8');
+        content = content.replace(/-Xmx\S+/g, '').replace(/-Xms\S+/g, '').trim();
+        content += `\n-Xms${updatedMinRam}M -Xmx${updatedMaxRam}M\n`;
+        if (updatedConfig.jvmArgs) {
+          content += `${updatedConfig.jvmArgs}\n`;
+        }
+        fs.writeFileSync(userJvmArgsPath, content, 'utf8');
+      } catch (err) {
+        console.warn('Failed to update user_jvm_args.txt:', err);
+      }
+    }
+
+    // If offline mode is enabled and skinRestorer is newly turned on
+    if (
+      updatedConfig.allowOffline &&
+      updatedConfig.skinRestorer &&
+      (!cfg.allowOffline || !cfg.skinRestorer)
+    ) {
+      try {
+        const isPlugin = updatedConfig.loader === 'paper';
+        await VersionFetcher.installSkinRestorer(updatedConfig.serverDir, isPlugin, (msg) => {
+          this.emitConsole(id, `§b[SkinRestorer] ${msg}\n`);
+        });
+      } catch (err: any) {
+        console.error('Failed to install SkinRestorer during config update:', err);
+      }
+    }
+
+    // Update in-memory active process config if active
+    const active = this.activeProcesses.get(id);
+    if (active) {
+      active.config = updatedConfig;
+    }
+
+    return updatedConfig;
+  }
+
   // 6. Start server
   public async startServer(id: string): Promise<boolean> {
     const cfg = this.getServer(id);

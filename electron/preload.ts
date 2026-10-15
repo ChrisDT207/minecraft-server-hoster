@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('server:delete', id, deleteFiles),
   openServerFolder: (id: string): Promise<void> =>
     ipcRenderer.invoke('server:openFolder', id),
+  updateServerConfig: (
+    id: string,
+    updates: Partial<ServerConfig>
+  ): Promise<ServerConfig> => ipcRenderer.invoke('server:updateConfig', id, updates),
+  selectJavaFile: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectJava'),
 
   // Lifecycle
   startServer: (id: string): Promise<boolean> =>
