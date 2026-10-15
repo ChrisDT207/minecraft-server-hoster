@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Cpu,
   Clock,
+  Sliders,
 } from 'lucide-react';
 import { ServerConfig, ServerStatus, ServerStats, PlayitStatus } from '../types';
 
@@ -23,6 +24,7 @@ interface ServerOverviewProps {
   onOpenFolder: () => void;
   onGoToConsole: () => void;
   onGoToTunnel: () => void;
+  onOpenEditModal: () => void;
 }
 
 export const ServerOverview: React.FC<ServerOverviewProps> = ({
@@ -34,6 +36,7 @@ export const ServerOverview: React.FC<ServerOverviewProps> = ({
   onOpenFolder,
   onGoToConsole,
   onGoToTunnel,
+  onOpenEditModal,
 }) => {
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
 
@@ -110,7 +113,15 @@ export const ServerOverview: React.FC<ServerOverviewProps> = ({
         <div className="bg-[#11141c] p-4 rounded-lg border border-zinc-800/80 flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400 mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">RAM Usage</span>
-            <HardDrive className="w-4 h-4 text-amber-400" />
+            <button
+              type="button"
+              onClick={onOpenEditModal}
+              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-medium flex items-center space-x-1 px-1.5 py-0.5 rounded bg-emerald-950/40 hover:bg-emerald-950/80 border border-emerald-800/40 transition-colors"
+              title="Adjust RAM Allocation"
+            >
+              <Sliders className="w-3 h-3" />
+              <span>Adjust</span>
+            </button>
           </div>
           <div className="text-2xl font-bold font-mono text-zinc-100">
             {isProcessActive ? stats?.memoryMb || 0 : 0}{' '}
@@ -248,9 +259,19 @@ export const ServerOverview: React.FC<ServerOverviewProps> = ({
 
       {/* 3. Server Configuration & Path Summary */}
       <div className="bg-[#11141c] rounded-lg border border-zinc-800/80 p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wide">
-          Server Details &amp; Environment
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wide">
+            Server Details &amp; Environment
+          </h2>
+          <button
+            type="button"
+            onClick={onOpenEditModal}
+            className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
+          >
+            <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Edit Configuration</span>
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div className="space-y-2.5">
@@ -264,15 +285,28 @@ export const ServerOverview: React.FC<ServerOverviewProps> = ({
               <span className="text-zinc-500">Minecraft Version</span>
               <span className="font-mono text-zinc-200">{server.version}</span>
             </div>
-            <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
+            <div className="flex justify-between py-1.5 border-b border-zinc-800/60 items-center">
               <span className="text-zinc-500">Assigned Port</span>
-              <span className="font-mono text-zinc-200">{server.port}</span>
+              <button
+                type="button"
+                onClick={onOpenEditModal}
+                className="font-mono text-zinc-200 hover:text-emerald-400 cursor-pointer"
+                title="Click to adjust Port"
+              >
+                {server.port}
+              </button>
             </div>
-            <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
+            <div className="flex justify-between py-1.5 border-b border-zinc-800/60 items-center">
               <span className="text-zinc-500">Memory Allocation</span>
-              <span className="font-mono text-zinc-200">
-                {server.minRam}MB min / {server.maxRam}MB max
-              </span>
+              <button
+                type="button"
+                onClick={onOpenEditModal}
+                className="font-mono text-zinc-200 hover:text-emerald-400 cursor-pointer flex items-center space-x-1"
+                title="Click to adjust RAM allocation"
+              >
+                <span>{server.minRam}MB min / {server.maxRam}MB max</span>
+                <Sliders className="w-3 h-3 text-emerald-400/80 ml-1" />
+              </button>
             </div>
           </div>
 

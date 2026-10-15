@@ -8,6 +8,7 @@ import { ServerProperties } from './components/ServerProperties';
 import { ModManager } from './components/ModManager';
 import { NetworkTunnel } from './components/NetworkTunnel';
 import { CreateServerModal } from './components/CreateServerModal';
+import { EditServerModal } from './components/EditServerModal';
 import { SettingsModal } from './components/SettingsModal';
 import { EmptyState } from './components/EmptyState';
 import { ServerConfig, ServerStatus, ServerStats, TabType, PlayitStatus } from './types';
@@ -24,6 +25,7 @@ export const App: React.FC = () => {
   const [playitStatus, setPlayitStatus] = useState<PlayitStatus | undefined>(undefined);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Load initial servers & system info
@@ -135,6 +137,10 @@ export const App: React.FC = () => {
     setActiveTab('overview');
   };
 
+  const handleServerUpdated = (updatedServer: ServerConfig) => {
+    setServers((prev) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen bg-[#090b10] text-zinc-100 font-sans overflow-hidden">
       {/* 1. Frameless Window TitleBar */}
@@ -168,6 +174,7 @@ export const App: React.FC = () => {
                 onRestart={handleRestartServer}
                 onOpenFolder={handleOpenFolder}
                 onDelete={handleDeleteServer}
+                onOpenEditModal={() => setIsEditModalOpen(true)}
               />
 
               {/* Tab Views */}
@@ -182,6 +189,7 @@ export const App: React.FC = () => {
                     onOpenFolder={handleOpenFolder}
                     onGoToConsole={() => setActiveTab('console')}
                     onGoToTunnel={() => setActiveTab('network')}
+                    onOpenEditModal={() => setIsEditModalOpen(true)}
                   />
                 )}
                 {activeTab === 'console' && (
@@ -192,7 +200,10 @@ export const App: React.FC = () => {
                   />
                 )}
                 {activeTab === 'properties' && (
-                  <ServerProperties server={selectedServer} />
+                  <ServerProperties
+                    server={selectedServer}
+                    onOpenEditModal={() => setIsEditModalOpen(true)}
+                  />
                 )}
                 {activeTab === 'mods' && (
                   <ModManager server={selectedServer} />
@@ -214,6 +225,17 @@ export const App: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         onServerCreated={handleServerCreated}
       />
+
+      {selectedServer && (
+        <EditServerModal
+          isOpen={isEditModalOpen}
+          server={selectedServer}
+          status={currentStatus}
+          onClose={() => setIsEditModalOpen(false)}
+          onServerUpdated={handleServerUpdated}
+          onRestartServer={handleRestartServer}
+        />
+      )}
 
       <SettingsModal
         isOpen={isSettingsModalOpen}

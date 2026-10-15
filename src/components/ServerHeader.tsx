@@ -23,6 +23,7 @@ interface ServerHeaderProps {
   onRestart: () => void;
   onOpenFolder: () => void;
   onDelete: () => void;
+  onOpenEditModal: () => void;
 }
 
 export const ServerHeader: React.FC<ServerHeaderProps> = ({
@@ -35,6 +36,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
   onRestart,
   onOpenFolder,
   onDelete,
+  onOpenEditModal,
 }) => {
   const isRunning = status === 'running';
   const isTransitioning = status === 'starting' || status === 'stopping';
@@ -62,9 +64,14 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
               <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/60">
                 Port: {server.port}
               </span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/60">
-                RAM: {Math.round(server.maxRam / 1024)}GB
-              </span>
+              <button
+                type="button"
+                onClick={onOpenEditModal}
+                className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-emerald-400 border border-zinc-700/60 hover:border-emerald-500/50 transition-colors cursor-pointer flex items-center space-x-1"
+                title="Click to adjust RAM allocation and specs"
+              >
+                <span>RAM: {Math.round((server.maxRam / 1024) * 10) / 10}GB</span>
+              </button>
             </div>
           </div>
           <div className="flex items-center space-x-2 text-xs text-zinc-400">
@@ -120,6 +127,16 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Restart</span>
+          </button>
+
+          {/* Edit Server Specs & RAM */}
+          <button
+            onClick={onOpenEditModal}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
+            title="Adjust RAM, Port, Java, and Server Settings"
+          >
+            <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Edit Specs</span>
           </button>
 
           {/* Open Directory */}
