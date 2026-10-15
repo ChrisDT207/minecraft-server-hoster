@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import { ServerManager } from './services/serverManager';
 import { VersionFetcher } from './services/versionFetcher';
 import { ModrinthService } from './services/modrinthService';
@@ -44,13 +45,14 @@ function createWindow() {
   const iconPath = path.join(__dirname, '../build/icon.ico');
 
   mainWindow = new BrowserWindow({
+    title: 'MC-ForgeDesk',
     width: 1280,
     height: 820,
     minWidth: 1024,
     minHeight: 680,
     frame: false, // Frameless for modern custom titlebar
     backgroundColor: '#0c0e14',
-    icon: iconPath,
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -91,7 +93,10 @@ function createWindow() {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
     // In production or built renderer
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    const indexPath = path.join(__dirname, '../dist/index.html');
+    mainWindow.loadFile(indexPath).catch((err) => {
+      console.error('Failed to load application index.html:', err);
+    });
   }
 
   // Open external links in default browser
@@ -131,6 +136,24 @@ function registerIpcHandlers() {
     if (s && s.serverDir) {
       await shell.openPath(s.serverDir);
     }
+  });
+  ipcMain.handle(
+    'server:updateConfig',
+    async (_, id: string, updates: Partial<ServerConfig>) => {
+      return await serverManager.updateServerConfig(id, updates);
+    }
+  );
+  ipcMain.handle('dialog:selectJava', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Java Executable (java.exe)',
+      properties: ['openFile'],
+      filters: [{ name: 'Executable (*.exe)', extensions: ['exe'] }],
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0];
+    }
+    return null;
   });
 
   // Server Lifecycle

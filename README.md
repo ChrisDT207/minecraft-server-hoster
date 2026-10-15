@@ -40,8 +40,10 @@ Built with **Electron**, **React 18**, **Vite**, **TypeScript**, and **Tailwind 
   - Drag-and-drop support for local `.jar` or `.mcpack` files.
   - Enable/disable toggles (via `.disabled` extension renaming) and package deletion.
 
-- **Server Configuration Editor**
-  - Dual-mode editor: visual form controls for common settings (MOTD, PVP, Difficulty, Max Players, Spawn Protection) or raw text editor for full `server.properties` control.
+- **Server Configuration & Live Specs Editor**
+  - Adjust Maximum RAM (`-Xmx`) and Initial Heap (`-Xms`) dynamically via sliders and presets without re-creating your server.
+  - Modify assigned ports, server display name, offline mode, custom Java paths, and custom JVM arguments on-the-fly with automatic `server.properties` and `mcfg-server.json` synchronization.
+  - Dual-mode editor: visual form controls for common gameplay settings or raw text editor for full `server.properties` control.
 
 - **Resource Monitoring & Safe Process Management**
   - Real-time CPU, RAM usage, and active player tracking.
@@ -67,6 +69,7 @@ minecraft-server-hoster/
 │   ├── App.tsx                 # Main layout & state orchestration
 │   ├── components/             # Modular UI components
 │   │   ├── CreateServerModal.tsx  # Server provisioning wizard
+│   │   ├── EditServerModal.tsx    # Live RAM, port, Java & specs editor
 │   │   ├── ModManager.tsx         # Modrinth browser & mod manager
 │   │   ├── NetworkTunnel.tsx      # Playit.gg public tunnel controller
 │   │   ├── ServerConsole.tsx      # xterm.js ANSI terminal with command history
