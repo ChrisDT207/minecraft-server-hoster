@@ -22,8 +22,10 @@
     },
     "files": [
       "dist/**/*",
+      "!dist/win-unpacked/**",
       "!dist/*.exe",
       "!dist/*.blockmap",
+      "!dist/*.yml",
       "!dist/builder-effective-config.yaml",
       "dist-electron/**/*"
     ],
