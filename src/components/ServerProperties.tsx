@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Save, RefreshCw, FileText, Check, AlertCircle } from 'lucide-react';
+import { Save, RefreshCw, FileText, Check, AlertCircle, Sliders } from 'lucide-react';
 import { ServerConfig } from '../types';
 
 interface ServerPropertiesProps {
   server: ServerConfig;
+  onOpenEditModal?: () => void;
 }
 
-export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) => {
+export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server, onOpenEditModal }) => {
   const [properties, setProperties] = useState<Record<string, string>>({});
   const [rawText, setRawText] = useState('');
   const [mode, setMode] = useState<'visual' | 'raw'>('visual');
@@ -130,6 +131,25 @@ export const ServerProperties: React.FC<ServerPropertiesProps> = ({ server }) =>
           </button>
         </div>
       </div>
+
+      {/* Engine & Host Settings Banner */}
+      {onOpenEditModal && (
+        <div className="bg-[#11141c] border-b border-zinc-800/80 px-6 py-2.5 flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-2 text-zinc-400">
+            <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+            <span>
+              Engine Allocation: <strong className="text-zinc-200">{server.minRam}MB</strong> min / <strong className="text-zinc-200">{server.maxRam}MB</strong> max RAM • Port: <strong className="text-zinc-200">{server.port}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenEditModal}
+            className="text-emerald-400 hover:text-emerald-300 font-medium text-xs hover:underline flex items-center space-x-1"
+          >
+            <span>Adjust RAM, Port &amp; Java Specs &rarr;</span>
+          </button>
+        </div>
+      )}
 
       {/* Editor Body */}
       <div className="flex-1 overflow-y-auto p-6">

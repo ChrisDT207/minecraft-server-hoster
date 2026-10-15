@@ -12,6 +12,8 @@ export interface ElectronAPI {
   createServer: (config: Omit<import('../../electron/types').ServerConfig, 'createdAt' | 'serverDir'>) => Promise<import('../../electron/types').ServerConfig>;
   deleteServer: (id: string, deleteFiles: boolean) => Promise<boolean>;
   openServerFolder: (id: string) => Promise<void>;
+  updateServerConfig: (id: string, updates: Partial<import('../../electron/types').ServerConfig>) => Promise<import('../../electron/types').ServerConfig>;
+  selectJavaFile: () => Promise<string | null>;
 
   // Server lifecycle
   startServer: (id: string) => Promise<boolean>;
