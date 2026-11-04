@@ -6,6 +6,9 @@ import { ServerManager } from './services/serverManager';
 import { VersionFetcher } from './services/versionFetcher';
 import { ModrinthService } from './services/modrinthService';
 import { PlayitRunner } from './services/playitRunner';
+import { PlayerManager } from './services/playerManager';
+import { WorldImporter } from './services/worldImporter';
+import { ShutdownManager } from './services/shutdownManager';
 import { detectJavaInstallations } from './services/javaDetector';
 import { ServerConfig, ServerEdition, ServerLoader } from './types';
 
@@ -89,6 +92,14 @@ function createWindow() {
     }
   });
 
+  // Wire Shutdown events
+  const shutdownManager = ShutdownManager.getInstance();
+  shutdownManager.setStatusCallback((status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('shutdown:status', status);
+    }
+  });
+
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
@@ -163,7 +174,18 @@ function registerIpcHandlers() {
   ipcMain.handle('server:sendCommand', (_, id: string, cmd: string) =>
     serverManager.sendCommand(id, cmd)
   );
+  ipcMain.handle('server:applyGamerules', (_, id: string, rules: Record<string, any>) =>
+    serverManager.applyGamerules(id, rules)
+  );
   ipcMain.handle('server:getStatus', (_, id: string) => serverManager.getStatus(id));
+
+  // Player Data & Inventories
+  ipcMain.handle('player:getAll', (_, serverId: string) =>
+    PlayerManager.getInstance().getPlayers(serverId)
+  );
+  ipcMain.handle('player:getInventory', (_, serverId: string, uuid: string) =>
+    PlayerManager.getInstance().getPlayerInventory(serverId, uuid)
+  );
 
   // Versions
   ipcMain.handle(
@@ -284,6 +306,67 @@ function registerIpcHandlers() {
   ipcMain.handle('playit:getStatus', () => playit.getStatus());
   ipcMain.handle('playit:start', (_, port: number) => playit.start(port));
   ipcMain.handle('playit:stop', () => playit.stop());
+
+  // World Import
+  ipcMain.handle('dialog:selectWorldFolder', async () => {
+    if (!mainWindow) return null;
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Minecraft World Folder (containing level.dat)',
+      properties: ['openDirectory'],
+    });
+    if (!res.canceled && res.filePaths.length > 0) {
+      return res.filePaths[0];
+    }
+    return null;
+  });
+
+  ipcMain.handle('dialog:selectWorldZip', async () => {
+    if (!mainWindow) return null;
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Minecraft World .zip Archive',
+      filters: [{ name: 'World Archive (*.zip)', extensions: ['zip'] }],
+      properties: ['openFile'],
+    });
+    if (!res.canceled && res.filePaths.length > 0) {
+      return res.filePaths[0];
+    }
+    return null;
+  });
+
+  ipcMain.handle('world:detectSaves', () => {
+    return WorldImporter.getInstance().detectSingleplayerSaves();
+  });
+
+  ipcMain.handle(
+    'world:importFolder',
+    (_, serverId: string, folderPath: string, targetWorldName?: string, backupExisting?: boolean) => {
+      return WorldImporter.getInstance().importFromFolder(serverId, folderPath, targetWorldName, backupExisting);
+    }
+  );
+
+  ipcMain.handle(
+    'world:importZip',
+    (_, serverId: string, zipPath: string, targetWorldName?: string, backupExisting?: boolean) => {
+      return WorldImporter.getInstance().importFromZip(serverId, zipPath, targetWorldName, backupExisting);
+    }
+  );
+
+  // Save & Close and Shutdown Controls
+  ipcMain.handle('shutdown:saveAndClose', (_, serverId: string) => {
+    return ShutdownManager.getInstance().saveAndCloseServer(serverId);
+  });
+
+  ipcMain.handle('shutdown:schedule', (_, options) => {
+    return ShutdownManager.getInstance().scheduleShutdown(options);
+  });
+
+  ipcMain.handle('shutdown:cancel', () => {
+    return ShutdownManager.getInstance().cancelShutdown();
+  });
+
+  ipcMain.handle('shutdown:getStatus', () => {
+    return ShutdownManager.getInstance().getStatus();
+  });
 
   // Window frame controls
   ipcMain.on('window:minimize', () => {
