@@ -19,6 +19,11 @@ export interface ServerConfig {
   eulaAccepted: boolean;
   createdAt: number;
   serverDir: string;
+  difficulty?: 'peaceful' | 'easy' | 'normal' | 'hard';
+  gamemode?: 'survival' | 'creative' | 'adventure' | 'spectator';
+  seed?: string;
+  hardcore?: boolean;
+  gamerules?: Record<string, any>;
 }
 
 export interface ServerStats {
@@ -84,5 +89,68 @@ export interface SystemInfo {
     path: string;
     version: string;
     major: number;
+    isDefault?: boolean;
   }[];
 }
+
+export interface PlayerItem {
+  slot: number;
+  id: string;
+  displayName: string;
+  count: number;
+  damage?: number;
+  maxDamage?: number;
+  customName?: string;
+  enchantments?: { id: string; name: string; level: number }[];
+  raw?: any;
+}
+
+export interface PlayerEquipment {
+  head?: PlayerItem;
+  chest?: PlayerItem;
+  legs?: PlayerItem;
+  feet?: PlayerItem;
+  offhand?: PlayerItem;
+}
+
+export interface PlayerSummary {
+  uuid: string;
+  name: string;
+  health: number;
+  maxHealth: number;
+  food: number;
+  xpLevel: number;
+  gamemode: number;
+  dimension: string;
+  pos: [number, number, number];
+  itemCount: number;
+  enderCount: number;
+  lastModified: number;
+}
+
+export interface PlayerInventoryDetails extends PlayerSummary {
+  equipment: PlayerEquipment;
+  inventory: PlayerItem[];
+  enderChest: PlayerItem[];
+}
+
+export interface SingleplayerSave {
+  name: string;
+  folderName: string;
+  path: string;
+  lastModified: number;
+  sizeMb: number;
+  icon?: string;
+}
+
+export interface ShutdownStatus {
+  active: boolean;
+  serverId?: string;
+  shutdownPc: boolean;
+  stopWhenEmpty: boolean;
+  totalSeconds: number;
+  remainingSeconds: number;
+  message?: string;
+}
+
+

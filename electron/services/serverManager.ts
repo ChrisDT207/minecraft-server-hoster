@@ -165,8 +165,9 @@ export class ServerManager {
       const serverPropsPath = path.join(serverDir, 'server.properties');
       const content = [
         `server-name=${config.name}`,
-        `gamemode=survival`,
-        `difficulty=easy`,
+        `gamemode=${config.gamemode || 'survival'}`,
+        `difficulty=${config.difficulty || 'easy'}`,
+        `level-seed=${config.seed || ''}`,
         `allow-cheats=true`,
         `max-players=10`,
         `online-mode=${!config.allowOffline}`,
@@ -174,8 +175,9 @@ export class ServerManager {
         `server-portv6=${config.port + 1}`,
         `view-distance=32`,
         `tick-distance=4`,
+        `level-name=Bedrock level`,
       ].join('\n');
-      fs.writeFileSync(serverPropsPath, content, 'utf8');
+      fs.writeFileSync(serverPropsPath, content + '\n', 'utf8');
       return;
     }
 
@@ -185,13 +187,23 @@ export class ServerManager {
       `motd=${config.name}`,
       `server-port=${config.port}`,
       `online-mode=${!config.allowOffline}`,
-      `difficulty=easy`,
-      `gamemode=survival`,
+      `difficulty=${config.difficulty || 'easy'}`,
+      `gamemode=${config.gamemode || 'survival'}`,
+      `hardcore=${config.hardcore ? 'true' : 'false'}`,
+      `level-seed=${config.seed || ''}`,
       `pvp=true`,
       `max-players=20`,
       `spawn-protection=16`,
       `white-list=false`,
       `enable-command-block=true`,
+      `spawn-monsters=true`,
+      `spawn-animals=true`,
+      `spawn-npcs=true`,
+      `allow-flight=false`,
+      `allow-nether=true`,
+      `generate-structures=true`,
+      `level-name=world`,
+      `level-type=minecraft\\:normal`,
       `view-distance=10`,
       `simulation-distance=10`,
     ];
@@ -272,6 +284,18 @@ export class ServerManager {
       } else {
         propsUpdates['motd'] = updates.name.trim();
       }
+    }
+    if (updates.difficulty !== undefined) {
+      propsUpdates['difficulty'] = updates.difficulty;
+    }
+    if (updates.gamemode !== undefined) {
+      propsUpdates['gamemode'] = updates.gamemode;
+    }
+    if (updates.seed !== undefined) {
+      propsUpdates['level-seed'] = updates.seed;
+    }
+    if (updates.hardcore !== undefined) {
+      propsUpdates['hardcore'] = updates.hardcore ? 'true' : 'false';
     }
 
     if (Object.keys(propsUpdates).length > 0) {
@@ -569,6 +593,26 @@ export class ServerManager {
     return true;
   }
 
+  // 9b. Apply and persist gamerules
+  public applyGamerules(id: string, gamerules: Record<string, any>): boolean {
+    const cfg = this.getServer(id);
+    if (!cfg) return false;
+
+    cfg.gamerules = { ...(cfg.gamerules || {}), ...gamerules };
+    const configPath = path.join(cfg.serverDir, 'mcfg-server.json');
+    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+    const active = this.activeProcesses.get(id);
+    if (active && active.status === 'running') {
+      for (const [rule, val] of Object.entries(gamerules)) {
+        if (val !== undefined && val !== null && val !== '') {
+          this.sendCommand(id, `gamerule ${rule} ${val}`);
+        }
+      }
+    }
+    return true;
+  }
+
   // 10. Status
   public getStatus(id: string): ServerStatus {
     const active = this.activeProcesses.get(id);
@@ -593,6 +637,17 @@ export class ServerManager {
         active.status = 'running';
         this.setStatus(active.config.id, 'running');
         this.emitConsole(active.config.id, `§a[MC-ForgeDesk] Server is now ONLINE and ready for players!\n`);
+
+        // Automatically apply configured gamerules on server startup
+        if (active.config.gamerules) {
+          setTimeout(() => {
+            for (const [rule, val] of Object.entries(active.config.gamerules || {})) {
+              if (val !== undefined && val !== null && val !== '') {
+                this.sendCommand(active.config.id, `gamerule ${rule} ${val}`);
+              }
+            }
+          }, 1500);
+        }
       }
     }
 
@@ -715,6 +770,57 @@ export class ServerManager {
     }
 
     fs.writeFileSync(propsPath, newLines.join('\n') + '\n', 'utf8');
+
+    // Keep mcfg-server.json in sync with properties
+    try {
+      const configPath = path.join(cfg.serverDir, 'mcfg-server.json');
+      if (fs.existsSync(configPath)) {
+        let changed = false;
+        if (properties['difficulty'] && properties['difficulty'] !== cfg.difficulty) {
+          cfg.difficulty = properties['difficulty'] as any;
+          changed = true;
+        }
+        if (properties['gamemode'] && properties['gamemode'] !== cfg.gamemode) {
+          cfg.gamemode = properties['gamemode'] as any;
+          changed = true;
+        }
+        if (properties['level-seed'] !== undefined && properties['level-seed'] !== cfg.seed) {
+          cfg.seed = properties['level-seed'];
+          changed = true;
+        }
+        if (properties['hardcore'] !== undefined) {
+          const isHardcore = properties['hardcore'] === 'true';
+          if (cfg.hardcore !== isHardcore) {
+            cfg.hardcore = isHardcore;
+            changed = true;
+          }
+        }
+        if (properties['server-port']) {
+          const newPort = Number(properties['server-port']);
+          if (!isNaN(newPort) && newPort !== cfg.port) {
+            cfg.port = newPort;
+            changed = true;
+          }
+        }
+        if (properties['motd'] && properties['motd'].trim() !== cfg.name) {
+          cfg.name = properties['motd'].trim();
+          changed = true;
+        }
+        if (properties['online-mode'] !== undefined) {
+          const isOffline = properties['online-mode'] === 'false';
+          if (cfg.allowOffline !== isOffline) {
+            cfg.allowOffline = isOffline;
+            changed = true;
+          }
+        }
+        if (changed) {
+          fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to sync mcfg-server.json with server.properties:', err);
+    }
+
     return true;
   }
 }

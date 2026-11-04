@@ -11,6 +11,10 @@ import {
   ModrinthHit,
   VersionOption,
   LoaderVersionOption,
+  PlayerSummary,
+  PlayerInventoryDetails,
+  SingleplayerSave,
+  ShutdownStatus,
 } from './types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -39,8 +43,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('server:restart', id),
   sendCommand: (id: string, command: string): Promise<boolean> =>
     ipcRenderer.invoke('server:sendCommand', id, command),
+  applyGamerules: (
+    serverId: string,
+    rules: Record<string, any>
+  ): Promise<boolean> => ipcRenderer.invoke('server:applyGamerules', serverId, rules),
   getServerStatus: (id: string): Promise<ServerStatus> =>
     ipcRenderer.invoke('server:getStatus', id),
+
+  // Player Data & Inventories
+  getPlayers: (serverId: string): Promise<PlayerSummary[]> =>
+    ipcRenderer.invoke('player:getAll', serverId),
+  getPlayerInventory: (
+    serverId: string,
+    uuid: string
+  ): Promise<PlayerInventoryDetails | null> =>
+    ipcRenderer.invoke('player:getInventory', serverId, uuid),
 
   // Events / Listeners
   onConsoleOutput: (callback: (data: { serverId: string; text: string }) => void) => {
@@ -134,4 +151,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.send('window:minimize'),
   maximizeWindow: () => ipcRenderer.send('window:maximize'),
   closeWindow: () => ipcRenderer.send('window:close'),
+
+  // World Import
+  selectWorldFolder: (): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:selectWorldFolder'),
+  selectWorldZip: (): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:selectWorldZip'),
+  detectSingleplayerSaves: (): Promise<SingleplayerSave[]> =>
+    ipcRenderer.invoke('world:detectSaves'),
+  importWorldFromFolder: (
+    serverId: string,
+    folderPath: string,
+    targetWorldName?: string,
+    backupExisting?: boolean
+  ): Promise<{ success: boolean; worldName: string; backupName?: string }> =>
+    ipcRenderer.invoke('world:importFolder', serverId, folderPath, targetWorldName, backupExisting),
+  importWorldFromZip: (
+    serverId: string,
+    zipPath: string,
+    targetWorldName?: string,
+    backupExisting?: boolean
+  ): Promise<{ success: boolean; worldName: string; backupName?: string }> =>
+    ipcRenderer.invoke('world:importZip', serverId, zipPath, targetWorldName, backupExisting),
+
+  // Save & Shutdown Controls
+  saveAndCloseServer: (serverId: string): Promise<boolean> =>
+    ipcRenderer.invoke('shutdown:saveAndClose', serverId),
+  scheduleShutdown: (options: {
+    serverId: string;
+    delayMinutes: number;
+    shutdownPc: boolean;
+    stopWhenEmpty: boolean;
+  }): Promise<ShutdownStatus> =>
+    ipcRenderer.invoke('shutdown:schedule', options),
+  cancelShutdown: (): Promise<boolean> =>
+    ipcRenderer.invoke('shutdown:cancel'),
+  getShutdownStatus: (): Promise<ShutdownStatus> =>
+    ipcRenderer.invoke('shutdown:getStatus'),
+  onShutdownStatus: (callback: (status: ShutdownStatus) => void) => {
+    const handler = (_: any, status: ShutdownStatus) => callback(status);
+    ipcRenderer.on('shutdown:status', handler);
+    return () => ipcRenderer.removeListener('shutdown:status', handler);
+  },
 });
