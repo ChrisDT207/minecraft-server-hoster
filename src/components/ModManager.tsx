@@ -380,7 +380,7 @@ export const ModManager: React.FC<ModManagerProps> = ({ server }) => {
                         <tr
                           key={mod.filename}
                           className={`transition-colors ${
-                            isSelected ? 'bg-zinc-850/80' : 'hover:bg-zinc-850/40'
+                            isSelected ? 'bg-zinc-800/80' : 'hover:bg-zinc-800/40'
                           }`}
                         >
                           {/* Row Selection Checkbox */}

@@ -12,6 +12,7 @@ import {
   Cpu,
   Clock,
   Sliders,
+  Database,
 } from 'lucide-react';
 import { ServerConfig, ServerStatus, ServerStats, PlayitStatus } from '../types';
 
@@ -24,7 +25,9 @@ interface ServerOverviewProps {
   onOpenFolder: () => void;
   onGoToConsole: () => void;
   onGoToTunnel: () => void;
+  onGoToPlayers?: () => void;
   onOpenEditModal: () => void;
+  onOpenImportModal?: () => void;
 }
 
 export const ServerOverview: React.FC<ServerOverviewProps> = ({
@@ -36,7 +39,9 @@ export const ServerOverview: React.FC<ServerOverviewProps> = ({
   onOpenFolder,
   onGoToConsole,
   onGoToTunnel,
+  onGoToPlayers,
   onOpenEditModal,
+  onOpenImportModal,
 }) => {
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
 
@@ -98,7 +103,19 @@ export const ServerOverview: React.FC<ServerOverviewProps> = ({
         <div className="bg-[#11141c] p-4 rounded-lg border border-zinc-800/80 flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400 mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">Players</span>
-            <Users className="w-4 h-4 text-blue-400" />
+            {onGoToPlayers ? (
+              <button
+                type="button"
+                onClick={onGoToPlayers}
+                className="text-[11px] text-blue-400 hover:text-blue-300 font-medium flex items-center space-x-1 px-1.5 py-0.5 rounded bg-blue-950/40 hover:bg-blue-950/80 border border-blue-800/40 transition-colors cursor-pointer"
+                title="Inspect player inventories & ender chests"
+              >
+                <Users className="w-3 h-3" />
+                <span>Inventories &rarr;</span>
+              </button>
+            ) : (
+              <Users className="w-4 h-4 text-blue-400" />
+            )}
           </div>
           <div className="text-2xl font-bold font-mono text-zinc-100">
             {isRunning ? stats?.playersOnline || 0 : 0}{' '}
@@ -263,14 +280,27 @@ export const ServerOverview: React.FC<ServerOverviewProps> = ({
           <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wide">
             Server Details &amp; Environment
           </h2>
-          <button
-            type="button"
-            onClick={onOpenEditModal}
-            className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
-          >
-            <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Edit Configuration</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {onOpenImportModal && (
+              <button
+                type="button"
+                onClick={onOpenImportModal}
+                className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
+                title="Import a Minecraft map or singleplayer world"
+              >
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Import World</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onOpenEditModal}
+              className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
+            >
+              <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Edit Configuration</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">

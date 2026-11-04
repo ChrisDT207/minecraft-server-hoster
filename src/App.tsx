@@ -5,13 +5,16 @@ import { ServerHeader } from './components/ServerHeader';
 import { ServerOverview } from './components/ServerOverview';
 import { ServerConsole } from './components/ServerConsole';
 import { ServerProperties } from './components/ServerProperties';
+import { PlayerManager } from './components/PlayerManager';
 import { ModManager } from './components/ModManager';
 import { NetworkTunnel } from './components/NetworkTunnel';
 import { CreateServerModal } from './components/CreateServerModal';
 import { EditServerModal } from './components/EditServerModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ImportWorldModal } from './components/ImportWorldModal';
+import { ShutdownModal } from './components/ShutdownModal';
 import { EmptyState } from './components/EmptyState';
-import { ServerConfig, ServerStatus, ServerStats, TabType, PlayitStatus } from './types';
+import { ServerConfig, ServerStatus, ServerStats, TabType, PlayitStatus, ShutdownStatus } from './types';
 
 export const App: React.FC = () => {
   const [servers, setServers] = useState<ServerConfig[]>([]);
@@ -27,6 +30,9 @@ export const App: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isShutdownModalOpen, setIsShutdownModalOpen] = useState(false);
+  const [shutdownStatus, setShutdownStatus] = useState<ShutdownStatus | undefined>(undefined);
 
   // Load initial servers & system info
   const loadServers = async () => {
@@ -62,6 +68,7 @@ export const App: React.FC = () => {
       });
 
       window.electronAPI.getPlayitStatus().then(setPlayitStatus);
+      window.electronAPI.getShutdownStatus().then(setShutdownStatus);
 
       // Listen to status changes
       const cleanupStatus = window.electronAPI.onServerStatusChange(({ serverId, status }) => {
@@ -78,10 +85,16 @@ export const App: React.FC = () => {
         setPlayitStatus(status);
       });
 
+      // Listen to shutdown timer status
+      const cleanupShutdown = window.electronAPI.onShutdownStatus((status) => {
+        setShutdownStatus(status);
+      });
+
       return () => {
         cleanupStatus?.();
         cleanupStats?.();
         cleanupPlayit?.();
+        cleanupShutdown?.();
       };
     }
   }, []);
@@ -131,6 +144,15 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSaveAndCloseServer = async () => {
+    if (!selectedServer) return;
+    await window.electronAPI.saveAndCloseServer(selectedServer.id);
+  };
+
+  const handleCancelShutdown = async () => {
+    await window.electronAPI.cancelShutdown();
+  };
+
   const handleServerCreated = (newServer: ServerConfig) => {
     setServers((prev) => [newServer, ...prev]);
     setSelectedServerId(newServer.id);
@@ -175,6 +197,11 @@ export const App: React.FC = () => {
                 onOpenFolder={handleOpenFolder}
                 onDelete={handleDeleteServer}
                 onOpenEditModal={() => setIsEditModalOpen(true)}
+                onOpenShutdownModal={() => setIsShutdownModalOpen(true)}
+                onSaveAndClose={handleSaveAndCloseServer}
+                onOpenImportModal={() => setIsImportModalOpen(true)}
+                shutdownStatus={shutdownStatus}
+                onCancelShutdown={handleCancelShutdown}
               />
 
               {/* Tab Views */}
@@ -189,7 +216,9 @@ export const App: React.FC = () => {
                     onOpenFolder={handleOpenFolder}
                     onGoToConsole={() => setActiveTab('console')}
                     onGoToTunnel={() => setActiveTab('network')}
+                    onGoToPlayers={() => setActiveTab('players')}
                     onOpenEditModal={() => setIsEditModalOpen(true)}
+                    onOpenImportModal={() => setIsImportModalOpen(true)}
                   />
                 )}
                 {activeTab === 'console' && (
@@ -203,6 +232,14 @@ export const App: React.FC = () => {
                   <ServerProperties
                     server={selectedServer}
                     onOpenEditModal={() => setIsEditModalOpen(true)}
+                    onOpenImportModal={() => setIsImportModalOpen(true)}
+                    onServerUpdated={handleServerUpdated}
+                  />
+                )}
+                {activeTab === 'players' && (
+                  <PlayerManager
+                    server={selectedServer}
+                    status={currentStatus}
                   />
                 )}
                 {activeTab === 'mods' && (
@@ -234,6 +271,28 @@ export const App: React.FC = () => {
           onClose={() => setIsEditModalOpen(false)}
           onServerUpdated={handleServerUpdated}
           onRestartServer={handleRestartServer}
+        />
+      )}
+
+      {selectedServer && (
+        <ImportWorldModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          server={selectedServer}
+          status={currentStatus}
+          onWorldImported={() => {
+            loadServers();
+          }}
+        />
+      )}
+
+      {selectedServer && (
+        <ShutdownModal
+          isOpen={isShutdownModalOpen}
+          onClose={() => setIsShutdownModalOpen(false)}
+          server={selectedServer}
+          status={currentStatus}
+          shutdownStatus={shutdownStatus}
         />
       )}
 

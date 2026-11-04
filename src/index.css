@@ -33,6 +33,24 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #353c52;
   }
+
+  /* Universal Dark Form Inputs & Selects (Prevents native OS white dropdown bug) */
+  select,
+  option,
+  input,
+  textarea {
+    color-scheme: dark;
+  }
+
+  select {
+    background-color: #11141c;
+    color: #e2e8f0;
+  }
+
+  option {
+    background-color: #11141c;
+    color: #e2e8f0;
+  }
 }
 
 /* XTerm styles */

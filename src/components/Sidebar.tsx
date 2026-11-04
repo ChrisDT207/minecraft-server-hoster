@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={`p-2.5 rounded border transition-colors cursor-pointer group flex flex-col space-y-1.5 ${
                   isSelected
                     ? 'bg-zinc-800/80 border-emerald-500/50 shadow-sm'
-                    : 'bg-zinc-900/50 border-zinc-800/70 hover:bg-zinc-850 hover:border-zinc-700/80'
+                    : 'bg-zinc-900/50 border-zinc-800/70 hover:bg-zinc-800/80 hover:border-zinc-700/80'
                 }`}
               >
                 {/* Title and Status */}
@@ -115,9 +115,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {server.allowOffline && (
                     <span
                       className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-950/60 text-amber-400 border border-amber-800/50"
-                      title="Offline / TLauncher clients allowed"
+                      title="Cracked & TLauncher clients permitted (online-mode=false)"
                     >
-                      Offline
+                      Cracked
                     </span>
                   )}
                 </div>

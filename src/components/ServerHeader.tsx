@@ -10,8 +10,13 @@ import {
   Package,
   Globe,
   LayoutDashboard,
+  Users,
+  Save,
+  Clock,
+  Database,
+  Flame,
 } from 'lucide-react';
-import { ServerConfig, ServerStatus, TabType } from '../types';
+import { ServerConfig, ServerStatus, TabType, ShutdownStatus } from '../types';
 
 interface ServerHeaderProps {
   server: ServerConfig;
@@ -24,6 +29,11 @@ interface ServerHeaderProps {
   onOpenFolder: () => void;
   onDelete: () => void;
   onOpenEditModal: () => void;
+  onOpenShutdownModal?: () => void;
+  onSaveAndClose?: () => void;
+  onOpenImportModal?: () => void;
+  shutdownStatus?: ShutdownStatus;
+  onCancelShutdown?: () => void;
 }
 
 export const ServerHeader: React.FC<ServerHeaderProps> = ({
@@ -37,6 +47,11 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
   onOpenFolder,
   onDelete,
   onOpenEditModal,
+  onOpenShutdownModal,
+  onSaveAndClose,
+  onOpenImportModal,
+  shutdownStatus,
+  onCancelShutdown,
 }) => {
   const isRunning = status === 'running';
   const isTransitioning = status === 'starting' || status === 'stopping';
@@ -45,9 +60,21 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
     { id: 'overview', label: 'Overview' },
     { id: 'console', label: 'Terminal / Console' },
     { id: 'properties', label: 'Configuration' },
+    { id: 'players', label: 'Players & Inventory' },
     { id: 'mods', label: server.loader === 'paper' ? 'Plugins' : 'Mods' },
     { id: 'network', label: 'Public Tunnel' },
   ];
+
+  const formatSeconds = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    if (m >= 60) {
+      const h = Math.floor(m / 60);
+      const remM = m % 60;
+      return `${h}h ${remM}m ${s < 10 ? '0' : ''}${s}s`;
+    }
+    return `${m}m ${s < 10 ? '0' : ''}${s}s`;
+  };
 
   return (
     <div className="bg-[#0e1119] border-b border-zinc-800/80 flex flex-col select-none">
@@ -101,7 +128,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
               }`}
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>{status === 'starting' ? 'Starting...' : 'Start Server'}</span>
+              <span>{(status as string) === 'starting' ? 'Starting...' : 'Start Server'}</span>
             </button>
           ) : (
             <button
@@ -114,7 +141,44 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
               }`}
             >
               <Square className="w-3.5 h-3.5 fill-current" />
-              <span>{status === 'stopping' ? 'Stopping...' : 'Stop'}</span>
+              <span>{(status as string) === 'stopping' ? 'Stopping...' : 'Stop'}</span>
+            </button>
+          )}
+
+          {/* Save & Close Button */}
+          {isRunning && onSaveAndClose && (
+            <button
+              onClick={onSaveAndClose}
+              disabled={isTransitioning}
+              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border border-amber-700/60 transition-colors shadow-xs"
+              title="Flushes world data to disk with save-all flush and gracefully stops the server"
+            >
+              <Save className="w-3.5 h-3.5 text-amber-400" />
+              <span>Save &amp; Close</span>
+            </button>
+          )}
+
+          {/* Auto Shutdown / Timer Button */}
+          {onOpenShutdownModal && (
+            <button
+              onClick={onOpenShutdownModal}
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
+              title="Schedule automatic server close or PC shutdown with countdown timer"
+            >
+              <Clock className="w-3.5 h-3.5 text-rose-400" />
+              <span>Auto Shutdown</span>
+            </button>
+          )}
+
+          {/* Import World Button */}
+          {onOpenImportModal && (
+            <button
+              onClick={onOpenImportModal}
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
+              title="Import a Minecraft world from folder, zip, or singleplayer"
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Import World</span>
             </button>
           )}
 
@@ -153,13 +217,38 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
           <button
             onClick={onDelete}
             disabled={isRunning}
-            className="flex items-center space-x-1 px-2.5 py-1.5 text-xs font-medium rounded bg-zinc-850 hover:bg-rose-950/60 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-900/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex items-center space-x-1 px-2.5 py-1.5 text-xs font-medium rounded bg-zinc-800 hover:bg-rose-950/60 text-zinc-400 hover:text-rose-400 border border-zinc-700/60 hover:border-rose-900/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="Delete Server"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+
+      {/* ACTIVE SHUTDOWN NOTIFICATION BANNER */}
+      {shutdownStatus?.active && (
+        <div className="px-6 py-2 bg-gradient-to-r from-rose-950/90 to-amber-950/80 border-t border-rose-800/60 flex items-center justify-between shadow-inner">
+          <div className="flex items-center space-x-2 text-xs text-rose-200">
+            <Flame className="w-4 h-4 text-rose-400 animate-pulse" />
+            <span className="font-bold">
+              {shutdownStatus.shutdownPc
+                ? 'Scheduled Auto PC Shutdown in progress:'
+                : 'Scheduled Server Close in progress:'}
+            </span>
+            <span className="font-mono font-bold px-2 py-0.5 rounded bg-black/60 text-amber-300 border border-amber-600/50">
+              {formatSeconds(shutdownStatus.remainingSeconds)} remaining
+            </span>
+          </div>
+          {onCancelShutdown && (
+            <button
+              onClick={onCancelShutdown}
+              className="px-2.5 py-1 text-xs font-bold rounded bg-rose-600 hover:bg-rose-500 text-white transition-colors shadow-xs"
+            >
+              Cancel Shutdown
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="flex items-center px-6 space-x-1 border-t border-zinc-800/60">
@@ -173,6 +262,8 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                 return <Terminal className="w-3.5 h-3.5" />;
               case 'properties':
                 return <Sliders className="w-3.5 h-3.5" />;
+              case 'players':
+                return <Users className="w-3.5 h-3.5" />;
               case 'mods':
                 return <Package className="w-3.5 h-3.5" />;
               case 'network':

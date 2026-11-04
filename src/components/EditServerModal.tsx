@@ -12,6 +12,8 @@ import {
   FolderOpen,
   Shield,
   Layers,
+  Compass,
+  Shuffle,
 } from 'lucide-react';
 import { ServerConfig, ServerStatus, SystemInfo } from '../types';
 
@@ -42,6 +44,14 @@ export const EditServerModal: React.FC<EditServerModalProps> = ({
   );
   const [allowOffline, setAllowOffline] = useState(server.allowOffline);
   const [skinRestorer, setSkinRestorer] = useState(server.skinRestorer);
+  const [difficulty, setDifficulty] = useState<'peaceful' | 'easy' | 'normal' | 'hard'>(
+    server.difficulty || 'normal'
+  );
+  const [gamemode, setGamemode] = useState<'survival' | 'creative' | 'adventure' | 'spectator'>(
+    server.gamemode || 'survival'
+  );
+  const [seed, setSeed] = useState(server.seed || '');
+  const [hardcore, setHardcore] = useState(server.hardcore || false);
   const [javaMode, setJavaMode] = useState<'auto' | 'detected' | 'custom'>(
     server.javaPath ? 'custom' : 'auto'
   );
@@ -66,6 +76,10 @@ export const EditServerModal: React.FC<EditServerModalProps> = ({
       setAutoMinRam(server.minRam === Math.round(server.maxRam / 2));
       setAllowOffline(server.allowOffline);
       setSkinRestorer(server.skinRestorer);
+      setDifficulty(server.difficulty || 'normal');
+      setGamemode(server.gamemode || 'survival');
+      setSeed(server.seed || '');
+      setHardcore(server.hardcore || false);
       setJavaMode(server.javaPath ? 'custom' : 'auto');
       setSelectedJavaPath(server.javaPath || '');
       setJvmArgs(server.jvmArgs || '');
@@ -93,6 +107,11 @@ export const EditServerModal: React.FC<EditServerModalProps> = ({
     } else if (minRamGb > val) {
       setMinRamGb(val);
     }
+  };
+
+  const handleRandomizeSeed = () => {
+    const rand = Math.floor(Math.random() * 9007199254740991) - 4503599627370495;
+    setSeed(rand.toString());
   };
 
   const handleBrowseJava = async () => {
@@ -126,6 +145,10 @@ export const EditServerModal: React.FC<EditServerModalProps> = ({
         skinRestorer: allowOffline && skinRestorer,
         javaPath: javaMode === 'auto' ? undefined : selectedJavaPath.trim() || undefined,
         jvmArgs: jvmArgs.trim() || undefined,
+        difficulty,
+        gamemode,
+        seed: seed.trim() || undefined,
+        hardcore,
       });
 
       onServerUpdated(updated);
@@ -228,7 +251,115 @@ export const EditServerModal: React.FC<EditServerModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Memory (RAM) Allocation */}
+          {/* Section 2: Gameplay & World Settings */}
+          <div className="p-4 bg-[#11141c] rounded-lg border border-zinc-800/80 space-y-4">
+            <div className="flex items-center space-x-2 text-zinc-200 font-semibold uppercase tracking-wide">
+              <Compass className="w-4 h-4 text-emerald-400" />
+              <span>World &amp; Gameplay Settings</span>
+            </div>
+
+            {/* Difficulty Selector */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-zinc-400 font-medium">Difficulty Level</label>
+                {hardcore && (
+                  <span className="text-[10px] text-rose-400">Locked to Hard by Hardcore Mode</span>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { id: 'peaceful', name: 'Peaceful', desc: 'No hostile mobs', active: 'bg-emerald-950/50 border-emerald-500 text-emerald-300' },
+                  { id: 'easy', name: 'Easy', desc: 'Reduced damage', active: 'bg-blue-950/50 border-blue-500 text-blue-300' },
+                  { id: 'normal', name: 'Normal', desc: 'Standard survival', active: 'bg-amber-950/50 border-amber-500 text-amber-300' },
+                  { id: 'hard', name: 'Hard', desc: 'Deadly mobs & starvation', active: 'bg-rose-950/50 border-rose-500 text-rose-300' },
+                ].map((diff) => (
+                  <button
+                    key={diff.id}
+                    type="button"
+                    disabled={hardcore}
+                    onClick={() => setDifficulty(diff.id as any)}
+                    className={`p-2 rounded border text-left flex flex-col space-y-0.5 transition-all ${
+                      difficulty === diff.id
+                        ? diff.active
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    } ${hardcore && diff.id !== 'hard' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="text-xs font-bold capitalize">{diff.name}</span>
+                    <span className="text-[10px] text-zinc-500 line-clamp-1">{diff.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Gamemode & Seed in 2 columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-zinc-400 font-medium mb-1.5">
+                  Default Gamemode
+                </label>
+                <select
+                  value={gamemode}
+                  onChange={(e) => setGamemode(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700/80 rounded text-zinc-100 font-medium text-xs focus:outline-hidden focus:border-emerald-500 capitalize"
+                >
+                  <option value="survival">Survival (Standard)</option>
+                  <option value="creative">Creative (Unlimited blocks & flight)</option>
+                  <option value="adventure">Adventure (Restricted block breaking)</option>
+                  <option value="spectator">Spectator (Invisible observer)</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-zinc-400 font-medium">World Seed</label>
+                  <button
+                    type="button"
+                    onClick={handleRandomizeSeed}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center space-x-1"
+                  >
+                    <Shuffle className="w-3 h-3" />
+                    <span>🎲 Randomize</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={seed}
+                  onChange={(e) => setSeed(e.target.value)}
+                  placeholder="Leave blank for random world"
+                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700/80 rounded text-zinc-100 font-mono text-xs focus:outline-hidden focus:border-emerald-500"
+                />
+                <span className="text-[10px] text-zinc-500 mt-1 block">
+                  Seed changes apply when generating new chunks or starting a new world save.
+                </span>
+              </div>
+            </div>
+
+            {/* Hardcore Mode toggle (Java Edition only) */}
+            {server.edition === 'java' && (
+              <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60">
+                <div>
+                  <span className="text-zinc-200 font-medium block">Hardcore Mode</span>
+                  <span className="text-[11px] text-zinc-500 block">
+                    Locks difficulty to Hard. Players get 1 life and cannot respawn upon death.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={hardcore}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setHardcore(checked);
+                    if (checked) {
+                      setDifficulty('hard');
+                    }
+                  }}
+                  className="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-rose-600 focus:ring-0 cursor-pointer"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Memory (RAM) Allocation */}
           <div className="p-4 bg-[#11141c] rounded-lg border border-zinc-800/80 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-zinc-200 font-semibold uppercase tracking-wide">
@@ -331,7 +462,7 @@ export const EditServerModal: React.FC<EditServerModalProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Player Authentication & Skins */}
+          {/* Section 4: Player Authentication & Skins */}
           <div className="p-4 bg-[#11141c] rounded-lg border border-zinc-800/80 space-y-3">
             <div className="flex items-center space-x-2 text-zinc-200 font-semibold uppercase tracking-wide">
               <Shield className="w-4 h-4 text-emerald-400" />
@@ -378,7 +509,7 @@ export const EditServerModal: React.FC<EditServerModalProps> = ({
             )}
           </div>
 
-          {/* Section 4: Java Runtime & JVM Flags (Java Edition only) */}
+          {/* Section 5: Java Runtime & JVM Flags (Java Edition only) */}
           {server.edition === 'java' && (
             <div className="p-4 bg-[#11141c] rounded-lg border border-zinc-800/80 space-y-4">
               <div className="flex items-center space-x-2 text-zinc-200 font-semibold uppercase tracking-wide">
