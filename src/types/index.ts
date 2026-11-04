@@ -1,7 +1,7 @@
 export * from '../../electron/types';
 
 export interface TabType {
-  id: 'overview' | 'console' | 'properties' | 'mods' | 'network';
+  id: 'overview' | 'console' | 'properties' | 'players' | 'mods' | 'network';
   label: string;
 }
 
@@ -20,7 +20,12 @@ export interface ElectronAPI {
   stopServer: (id: string) => Promise<boolean>;
   restartServer: (id: string) => Promise<boolean>;
   sendCommand: (id: string, command: string) => Promise<boolean>;
+  applyGamerules: (serverId: string, rules: Record<string, any>) => Promise<boolean>;
   getServerStatus: (id: string) => Promise<import('../../electron/types').ServerStatus>;
+
+  // Player Data & Inventories
+  getPlayers: (serverId: string) => Promise<import('../../electron/types').PlayerSummary[]>;
+  getPlayerInventory: (serverId: string, uuid: string) => Promise<import('../../electron/types').PlayerInventoryDetails | null>;
 
   // Console & metrics
   onConsoleOutput: (callback: (data: { serverId: string; text: string }) => void) => () => void;
@@ -56,6 +61,35 @@ export interface ElectronAPI {
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
+
+  // World Import
+  selectWorldFolder: () => Promise<string | null>;
+  selectWorldZip: () => Promise<string | null>;
+  detectSingleplayerSaves: () => Promise<import('../../electron/types').SingleplayerSave[]>;
+  importWorldFromFolder: (
+    serverId: string,
+    folderPath: string,
+    targetWorldName?: string,
+    backupExisting?: boolean
+  ) => Promise<{ success: boolean; worldName: string; backupName?: string }>;
+  importWorldFromZip: (
+    serverId: string,
+    zipPath: string,
+    targetWorldName?: string,
+    backupExisting?: boolean
+  ) => Promise<{ success: boolean; worldName: string; backupName?: string }>;
+
+  // Save & Close and Shutdown Controls
+  saveAndCloseServer: (serverId: string) => Promise<boolean>;
+  scheduleShutdown: (options: {
+    serverId: string;
+    delayMinutes: number;
+    shutdownPc: boolean;
+    stopWhenEmpty: boolean;
+  }) => Promise<import('../../electron/types').ShutdownStatus>;
+  cancelShutdown: () => Promise<boolean>;
+  getShutdownStatus: () => Promise<import('../../electron/types').ShutdownStatus>;
+  onShutdownStatus: (callback: (status: import('../../electron/types').ShutdownStatus) => void) => () => void;
 }
 
 declare global {
