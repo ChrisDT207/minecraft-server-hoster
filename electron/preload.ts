@@ -15,6 +15,8 @@ import {
   PlayerInventoryDetails,
   SingleplayerSave,
   ShutdownStatus,
+  RemoteHubConfig,
+  RemoteHubStatus,
 } from './types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -192,5 +194,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_: any, status: ShutdownStatus) => callback(status);
     ipcRenderer.on('shutdown:status', handler);
     return () => ipcRenderer.removeListener('shutdown:status', handler);
+  },
+
+  // Remote Management Hub
+  getRemoteHubStatus: (): Promise<RemoteHubStatus> =>
+    ipcRenderer.invoke('remoteHub:getStatus'),
+  updateRemoteHubConfig: (
+    config: Partial<RemoteHubConfig>
+  ): Promise<RemoteHubStatus> =>
+    ipcRenderer.invoke('remoteHub:updateConfig', config),
+  regenerateRemoteHubPin: (): Promise<RemoteHubStatus> =>
+    ipcRenderer.invoke('remoteHub:regeneratePin'),
+  onRemoteHubStatus: (callback: (status: RemoteHubStatus) => void) => {
+    const handler = (_: any, status: RemoteHubStatus) => callback(status);
+    ipcRenderer.on('remoteHub:status', handler);
+    return () => ipcRenderer.removeListener('remoteHub:status', handler);
   },
 });

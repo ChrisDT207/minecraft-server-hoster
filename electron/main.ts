@@ -9,6 +9,7 @@ import { PlayitRunner } from './services/playitRunner';
 import { PlayerManager } from './services/playerManager';
 import { WorldImporter } from './services/worldImporter';
 import { ShutdownManager } from './services/shutdownManager';
+import { RemoteHub } from './services/remoteHub';
 import { detectJavaInstallations } from './services/javaDetector';
 import { ServerConfig, ServerEdition, ServerLoader } from './types';
 
@@ -64,23 +65,38 @@ function createWindow() {
     },
   });
 
-  // Wire ServerManager events to renderer
+  // Initialize RemoteHub with detected IPs and start server
+  const { localIp, radminIp } = getNetworkIps();
+  const remoteHub = RemoteHub.getInstance();
+  remoteHub.setNetworkIps(localIp, radminIp);
+  remoteHub.start();
+
+  remoteHub.onStatusChange((status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('remoteHub:status', status);
+    }
+  });
+
+  // Wire ServerManager events to renderer and RemoteHub clients
   const serverManager = ServerManager.getInstance();
   serverManager.setEventCallbacks({
     onConsole: (serverId, text) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('server:console', { serverId, text });
       }
+      remoteHub.broadcast('server:console', { serverId, text });
     },
     onStatus: (serverId, status) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('server:status', { serverId, status });
       }
+      remoteHub.broadcast('server:status', { serverId, status });
     },
     onStats: (serverId, stats) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('server:stats', { serverId, stats });
       }
+      remoteHub.broadcast('server:stats', { serverId, stats });
     },
   });
 
@@ -90,6 +106,7 @@ function createWindow() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('playit:status', status);
     }
+    remoteHub.broadcast('playit:status', status);
   });
 
   // Wire Shutdown events
@@ -98,6 +115,7 @@ function createWindow() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('shutdown:status', status);
     }
+    remoteHub.broadcast('shutdown:status', status);
   });
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
@@ -368,6 +386,17 @@ function registerIpcHandlers() {
     return ShutdownManager.getInstance().getStatus();
   });
 
+  // Remote Management Hub
+  ipcMain.handle('remoteHub:getStatus', () => {
+    return RemoteHub.getInstance().getStatus();
+  });
+  ipcMain.handle('remoteHub:updateConfig', (_, config) => {
+    return RemoteHub.getInstance().updateConfig(config);
+  });
+  ipcMain.handle('remoteHub:regeneratePin', () => {
+    return RemoteHub.getInstance().regeneratePin();
+  });
+
   // Window frame controls
   ipcMain.on('window:minimize', () => {
     mainWindow?.minimize();
@@ -398,8 +427,9 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  // Stop playit on exit
+  // Stop playit and remote hub on exit
   PlayitRunner.getInstance().stop();
+  RemoteHub.getInstance().stop();
 
   if (process.platform !== 'darwin') {
     app.quit();

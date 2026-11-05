@@ -153,4 +153,31 @@ export interface ShutdownStatus {
   message?: string;
 }
 
+export interface RemoteHubConfig {
+  enabled: boolean;
+  port: number;
+  pin: string;
+  allowControl: boolean;
+}
+
+export interface RemoteHubStatus {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  pin: string;
+  allowControl: boolean;
+  localUrl: string;
+  radminUrl?: string;
+  inviteCode: string;
+  connectedClients: number;
+}
+
+export interface SavedRemoteHost {
+  id: string;
+  name: string;
+  address: string;
+  pin: string;
+  lastConnected?: number;
+}
+
 
