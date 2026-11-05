@@ -90,6 +90,12 @@ export interface ElectronAPI {
   cancelShutdown: () => Promise<boolean>;
   getShutdownStatus: () => Promise<import('../../electron/types').ShutdownStatus>;
   onShutdownStatus: (callback: (status: import('../../electron/types').ShutdownStatus) => void) => () => void;
+
+  // Remote Management Hub
+  getRemoteHubStatus: () => Promise<import('../../electron/types').RemoteHubStatus>;
+  updateRemoteHubConfig: (config: Partial<import('../../electron/types').RemoteHubConfig>) => Promise<import('../../electron/types').RemoteHubStatus>;
+  regenerateRemoteHubPin: () => Promise<import('../../electron/types').RemoteHubStatus>;
+  onRemoteHubStatus: (callback: (status: import('../../electron/types').RemoteHubStatus) => void) => () => void;
 }
 
 declare global {

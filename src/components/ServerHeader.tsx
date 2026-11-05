@@ -34,6 +34,7 @@ interface ServerHeaderProps {
   onOpenImportModal?: () => void;
   shutdownStatus?: ShutdownStatus;
   onCancelShutdown?: () => void;
+  isRemoteMode?: boolean;
 }
 
 export const ServerHeader: React.FC<ServerHeaderProps> = ({
@@ -52,6 +53,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
   onOpenImportModal,
   shutdownStatus,
   onCancelShutdown,
+  isRemoteMode,
 }) => {
   const isRunning = status === 'running';
   const isTransitioning = status === 'starting' || status === 'stopping';
@@ -109,6 +111,15 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
               <>
                 <span>•</span>
                 <span className="text-amber-400 font-medium">Offline / TLauncher Enabled</span>
+              </>
+            )}
+            {isRemoteMode && (
+              <>
+                <span>•</span>
+                <span className="text-emerald-400 font-semibold flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Remote Sync Active</span>
+                </span>
               </>
             )}
           </div>

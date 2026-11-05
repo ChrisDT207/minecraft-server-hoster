@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Server, Settings, Wifi, Copy, Check } from 'lucide-react';
+import { Plus, Server, Settings, Wifi, Copy, Check, Globe, LogOut } from 'lucide-react';
 import { ServerConfig, ServerStatus } from '../types';
 
 interface SidebarProps {
@@ -10,6 +10,10 @@ interface SidebarProps {
   onOpenCreateModal: () => void;
   onOpenSettingsModal: () => void;
   localIp: string;
+  isRemoteMode?: boolean;
+  remoteHostAddress?: string;
+  onOpenConnectRemoteModal?: () => void;
+  onDisconnectRemote?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,6 +24,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenCreateModal,
   onOpenSettingsModal,
   localIp,
+  isRemoteMode = false,
+  remoteHostAddress,
+  onOpenConnectRemoteModal,
+  onDisconnectRemote,
 }) => {
   const [copiedIp, setCopiedIp] = React.useState(false);
 
@@ -46,24 +54,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className="w-64 bg-[#0d1017] border-r border-zinc-800/80 flex flex-col h-full select-none">
+      {/* Remote Mode Active Banner */}
+      {isRemoteMode ? (
+        <div className="p-3 bg-gradient-to-r from-emerald-950/80 to-[#0e171e] border-b border-emerald-800/60 flex items-center justify-between">
+          <div className="min-w-0 pr-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center space-x-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Remote Host</span>
+            </span>
+            <span className="font-mono text-xs text-zinc-100 block truncate font-semibold">
+              {remoteHostAddress || 'Connected'}
+            </span>
+          </div>
+          {onDisconnectRemote && (
+            <button
+              onClick={onDisconnectRemote}
+              className="flex items-center space-x-1 px-2 py-1 text-[11px] rounded bg-zinc-800 hover:bg-rose-950/70 text-zinc-300 hover:text-rose-300 border border-zinc-700/60 transition-colors shrink-0"
+              title="Disconnect from remote host and switch to local servers"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>Disconnect</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="px-3 py-2 bg-[#0b0e14] border-b border-zinc-800/60 flex items-center justify-between">
+          <span className="text-[11px] text-zinc-400 font-medium">Remote Control</span>
+          {onOpenConnectRemoteModal && (
+            <button
+              onClick={onOpenConnectRemoteModal}
+              className="flex items-center space-x-1 px-2 py-1 text-[11px] rounded bg-zinc-800 hover:bg-zinc-700 text-emerald-400 hover:text-emerald-300 border border-zinc-700/60 transition-colors"
+              title="Connect to a friend's PC running MC-ForgeDesk"
+            >
+              <Globe className="w-3 h-3" />
+              <span>Connect Friend</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="p-3 border-b border-zinc-800/80 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            Servers
+            {isRemoteMode ? 'Remote Servers' : 'Local Servers'}
           </span>
           <span className="px-1.5 py-0.2 text-[10px] font-mono rounded bg-zinc-800 text-zinc-400 border border-zinc-700/60">
             {servers.length}
           </span>
         </div>
-        <button
-          onClick={onOpenCreateModal}
-          className="flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
-          title="Create New Minecraft Server"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Server</span>
-        </button>
+        {!isRemoteMode && (
+          <button
+            onClick={onOpenCreateModal}
+            className="flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
+            title="Create New Minecraft Server"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Server</span>
+          </button>
+        )}
       </div>
 
       {/* Server List */}
@@ -71,9 +120,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {servers.length === 0 ? (
           <div className="p-4 text-center text-xs text-zinc-500">
             <Server className="w-8 h-8 mx-auto mb-2 opacity-30 text-zinc-400" />
-            <p>No servers configured.</p>
+            <p>{isRemoteMode ? 'No servers on remote host.' : 'No servers configured.'}</p>
             <p className="mt-1 text-[11px] text-zinc-600">
-              Click &quot;New Server&quot; to provision your first server.
+              {isRemoteMode
+                ? 'Your friend has not created any servers yet.'
+                : 'Click "New Server" to provision your first server.'}
             </p>
           </div>
         ) : (

@@ -13,8 +13,11 @@ import { EditServerModal } from './components/EditServerModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportWorldModal } from './components/ImportWorldModal';
 import { ShutdownModal } from './components/ShutdownModal';
+import { ConnectRemoteModal } from './components/ConnectRemoteModal';
 import { EmptyState } from './components/EmptyState';
 import { ServerConfig, ServerStatus, ServerStats, TabType, PlayitStatus, ShutdownStatus } from './types';
+import { api, apiBridge } from './services/apiBridge';
+import { Globe, Key, AlertCircle, RefreshCw, Server as ServerIcon } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [servers, setServers] = useState<ServerConfig[]>([]);
@@ -32,72 +35,101 @@ export const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isShutdownModalOpen, setIsShutdownModalOpen] = useState(false);
+  const [isConnectRemoteModalOpen, setIsConnectRemoteModalOpen] = useState(false);
   const [shutdownStatus, setShutdownStatus] = useState<ShutdownStatus | undefined>(undefined);
+
+  // Remote Mode state
+  const [isRemoteMode, setIsRemoteMode] = useState<boolean>(apiBridge.getMode() === 'remote');
+  const [remoteAddress, setRemoteAddress] = useState<string | undefined>(
+    apiBridge.getRemoteHost()?.address
+  );
+
+  // Web Browser login state (for visitors in Chrome/Edge without Electron)
+  const isWebClient = typeof window !== 'undefined' && !window.electronAPI;
+  const isWebAuthenticated = !isWebClient || !!apiBridge.getRemoteHost();
+  const [webPin, setWebPin] = useState('');
+  const [webError, setWebError] = useState<string | null>(null);
+  const [webLoggingIn, setWebLoggingIn] = useState(false);
 
   // Load initial servers & system info
   const loadServers = async () => {
     try {
-      if (window.electronAPI) {
-        const list = await window.electronAPI.getServers();
-        setServers(list);
+      const list = await api.getServers();
+      setServers(list);
 
-        if (list.length > 0 && !selectedServerId) {
+      if (list.length > 0) {
+        if (!selectedServerId || !list.some((s) => s.id === selectedServerId)) {
           setSelectedServerId(list[0].id);
         }
-
-        // Fetch statuses for each server
-        const statusMap: Record<string, ServerStatus> = {};
-        for (const s of list) {
-          const st = await window.electronAPI.getServerStatus(s.id);
-          statusMap[s.id] = st;
-        }
-        setServerStatuses(statusMap);
+      } else {
+        setSelectedServerId(null);
       }
+
+      // Fetch statuses for each server
+      const statusMap: Record<string, ServerStatus> = {};
+      for (const s of list) {
+        try {
+          const st = await api.getServerStatus(s.id);
+          statusMap[s.id] = st;
+        } catch {}
+      }
+      setServerStatuses(statusMap);
     } catch (err) {
       console.error('Error loading servers:', err);
     }
   };
 
   useEffect(() => {
-    loadServers();
-
-    if (window.electronAPI) {
-      window.electronAPI.getSystemInfo().then((info) => {
-        if (info.localIp) setLocalIp(info.localIp);
-        if (info.radminIp) setRadminIp(info.radminIp);
-      });
-
-      window.electronAPI.getPlayitStatus().then(setPlayitStatus);
-      window.electronAPI.getShutdownStatus().then(setShutdownStatus);
-
-      // Listen to status changes
-      const cleanupStatus = window.electronAPI.onServerStatusChange(({ serverId, status }) => {
-        setServerStatuses((prev) => ({ ...prev, [serverId]: status }));
-      });
-
-      // Listen to server stats
-      const cleanupStats = window.electronAPI.onServerStats(({ serverId, stats }) => {
-        setServerStats((prev) => ({ ...prev, [serverId]: stats }));
-      });
-
-      // Listen to playit status
-      const cleanupPlayit = window.electronAPI.onPlayitStatus((status) => {
-        setPlayitStatus(status);
-      });
-
-      // Listen to shutdown timer status
-      const cleanupShutdown = window.electronAPI.onShutdownStatus((status) => {
-        setShutdownStatus(status);
-      });
-
-      return () => {
-        cleanupStatus?.();
-        cleanupStats?.();
-        cleanupPlayit?.();
-        cleanupShutdown?.();
-      };
+    if (isWebAuthenticated) {
+      loadServers();
     }
-  }, []);
+
+    // Load system and network info
+    api.getSystemInfo().then((info) => {
+      if (info?.localIp) setLocalIp(info.localIp);
+      if (info?.radminIp) setRadminIp(info.radminIp);
+    }).catch(() => {});
+
+    api.getPlayitStatus().then(setPlayitStatus).catch(() => {});
+    api.getShutdownStatus().then(setShutdownStatus).catch(() => {});
+
+    // Listen to status changes
+    const cleanupStatus = api.onServerStatusChange(({ serverId, status }) => {
+      setServerStatuses((prev) => ({ ...prev, [serverId]: status }));
+    });
+
+    // Listen to server stats
+    const cleanupStats = api.onServerStats(({ serverId, stats }) => {
+      setServerStats((prev) => ({ ...prev, [serverId]: stats }));
+    });
+
+    // Listen to playit status
+    const cleanupPlayit = api.onPlayitStatus((status) => {
+      setPlayitStatus(status);
+    });
+
+    // Listen to shutdown timer status
+    const cleanupShutdown = api.onShutdownStatus((status) => {
+      setShutdownStatus(status);
+    });
+
+    // Listen to remote connection changes (switching between local & remote host)
+    const cleanupConn = apiBridge.onConnectionChange(() => {
+      const mode = apiBridge.getMode();
+      const host = apiBridge.getRemoteHost();
+      setIsRemoteMode(mode === 'remote');
+      setRemoteAddress(host?.address);
+      loadServers();
+    });
+
+    return () => {
+      cleanupStatus?.();
+      cleanupStats?.();
+      cleanupPlayit?.();
+      cleanupShutdown?.();
+      cleanupConn?.();
+    };
+  }, [isWebAuthenticated]);
 
   const selectedServer = servers.find((s) => s.id === selectedServerId) || null;
   const currentStatus: ServerStatus = selectedServer
@@ -108,27 +140,27 @@ export const App: React.FC = () => {
   // Actions
   const handleStartServer = async () => {
     if (!selectedServer) return;
-    await window.electronAPI.startServer(selectedServer.id);
+    await api.startServer(selectedServer.id);
   };
 
   const handleStopServer = async () => {
     if (!selectedServer) return;
-    await window.electronAPI.stopServer(selectedServer.id);
+    await api.stopServer(selectedServer.id);
   };
 
   const handleRestartServer = async () => {
     if (!selectedServer) return;
-    await window.electronAPI.restartServer(selectedServer.id);
+    await api.restartServer(selectedServer.id);
   };
 
   const handleSendCommand = (cmd: string) => {
     if (!selectedServer) return;
-    window.electronAPI.sendCommand(selectedServer.id, cmd);
+    api.sendCommand(selectedServer.id, cmd);
   };
 
   const handleOpenFolder = () => {
     if (!selectedServer) return;
-    window.electronAPI.openServerFolder(selectedServer.id);
+    api.openServerFolder(selectedServer.id);
   };
 
   const handleDeleteServer = async () => {
@@ -137,7 +169,7 @@ export const App: React.FC = () => {
       `Are you sure you want to delete server "${selectedServer.name}"?\nThis will remove the server configuration and its files.`
     );
     if (confirmDelete) {
-      await window.electronAPI.deleteServer(selectedServer.id, true);
+      await api.deleteServer(selectedServer.id, true);
       const remaining = servers.filter((s) => s.id !== selectedServer.id);
       setServers(remaining);
       setSelectedServerId(remaining.length > 0 ? remaining[0].id : null);
@@ -146,11 +178,11 @@ export const App: React.FC = () => {
 
   const handleSaveAndCloseServer = async () => {
     if (!selectedServer) return;
-    await window.electronAPI.saveAndCloseServer(selectedServer.id);
+    await api.saveAndCloseServer(selectedServer.id);
   };
 
   const handleCancelShutdown = async () => {
-    await window.electronAPI.cancelShutdown();
+    await api.cancelShutdown();
   };
 
   const handleServerCreated = (newServer: ServerConfig) => {
@@ -163,10 +195,92 @@ export const App: React.FC = () => {
     setServers((prev) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
   };
 
+  const handleWebLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!webPin.trim()) return;
+    setWebLoggingIn(true);
+    setWebError(null);
+    try {
+      const host = window.location.host;
+      await apiBridge.connectRemote(host, webPin.trim());
+    } catch (err: any) {
+      setWebError(err.message || 'Authentication failed');
+    } finally {
+      setWebLoggingIn(false);
+    }
+  };
+
+  // --- 0. BROWSER ACCESS LOGIN SCREEN (WHEN VISITED VIA CHROME/SAFARI) ---
+  if (isWebClient && !isWebAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen w-screen bg-[#090b10] text-zinc-100 p-4 select-none">
+        <div className="bg-[#0e1119] border border-zinc-800 rounded-xl p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
+          <div className="mx-auto w-12 h-12 rounded-xl bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
+            <ServerIcon className="w-6 h-6" />
+          </div>
+
+          <div>
+            <h1 className="text-lg font-bold text-zinc-100">MC-ForgeDesk Remote Hub</h1>
+            <p className="text-xs text-zinc-400 mt-1">
+              Connected to host at <span className="font-mono text-emerald-400">{window.location.host}</span>
+            </p>
+          </div>
+
+          {webError && (
+            <div className="p-3 bg-rose-950/50 border border-rose-800/70 rounded text-xs text-rose-300 flex items-center space-x-2 text-left">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{webError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleWebLogin} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1 flex items-center space-x-1.5">
+                <Key className="w-3.5 h-3.5 text-amber-400" />
+                <span>Enter Remote Access PIN:</span>
+              </label>
+              <input
+                type="password"
+                maxLength={10}
+                value={webPin}
+                onChange={(e) => setWebPin(e.target.value)}
+                placeholder="6-digit Host PIN"
+                className="w-full bg-[#131722] border border-zinc-700/80 rounded px-3 py-2 text-center text-sm font-mono tracking-widest text-zinc-100 placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={webLoggingIn || !webPin.trim()}
+              className="w-full py-2.5 px-4 text-xs font-bold rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-md flex items-center justify-center space-x-2 disabled:opacity-40"
+            >
+              {webLoggingIn ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Verifying PIN...</span>
+                </>
+              ) : (
+                <>
+                  <Globe className="w-4 h-4" />
+                  <span>Unlock Remote Dashboard</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="text-[11px] text-zinc-500">
+            Ask the server host for their 6-digit Remote Access PIN displayed in their MC-ForgeDesk app.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen bg-[#090b10] text-zinc-100 font-sans overflow-hidden">
-      {/* 1. Frameless Window TitleBar */}
-      <TitleBar serverCount={servers.length} />
+      {/* 1. Frameless Window TitleBar (Hidden in pure web browser) */}
+      {!isWebClient && <TitleBar serverCount={servers.length} />}
 
       {/* 2. Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
@@ -179,6 +293,13 @@ export const App: React.FC = () => {
           onOpenCreateModal={() => setIsCreateModalOpen(true)}
           onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
           localIp={localIp}
+          isRemoteMode={isRemoteMode}
+          remoteHostAddress={remoteAddress}
+          onOpenConnectRemoteModal={() => setIsConnectRemoteModalOpen(true)}
+          onDisconnectRemote={() => {
+            apiBridge.disconnectRemote();
+            loadServers();
+          }}
         />
 
         {/* Right Workspace */}
@@ -202,6 +323,7 @@ export const App: React.FC = () => {
                 onOpenImportModal={() => setIsImportModalOpen(true)}
                 shutdownStatus={shutdownStatus}
                 onCancelShutdown={handleCancelShutdown}
+                isRemoteMode={isRemoteMode}
               />
 
               {/* Tab Views */}
@@ -295,6 +417,14 @@ export const App: React.FC = () => {
           shutdownStatus={shutdownStatus}
         />
       )}
+
+      <ConnectRemoteModal
+        isOpen={isConnectRemoteModalOpen}
+        onClose={() => setIsConnectRemoteModalOpen(false)}
+        onConnected={() => {
+          loadServers();
+        }}
+      />
 
       <SettingsModal
         isOpen={isSettingsModalOpen}

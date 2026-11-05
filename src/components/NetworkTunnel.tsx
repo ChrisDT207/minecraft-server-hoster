@@ -10,8 +10,15 @@ import {
   Square,
   Terminal,
   Activity,
+  Key,
+  Share2,
+  RefreshCw,
+  Power,
+  Users,
+  Monitor,
 } from 'lucide-react';
-import { ServerConfig, PlayitStatus } from '../types';
+import { ServerConfig, PlayitStatus, RemoteHubStatus } from '../types';
+import { api } from '../services/apiBridge';
 
 interface NetworkTunnelProps {
   server: ServerConfig;
@@ -25,22 +32,37 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
     running: false,
     recentLogs: [],
   });
+  const [remoteHubStatus, setRemoteHubStatus] = useState<RemoteHubStatus | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [isToggling, setIsToggling] = useState(false);
+  const [isTogglingPlayit, setIsTogglingPlayit] = useState(false);
+  const [isTogglingHub, setIsTogglingHub] = useState(false);
+  const [isRegeneratingPin, setIsRegeneratingPin] = useState(false);
 
   const loadStatus = async () => {
     try {
-      const st = await window.electronAPI.getPlayitStatus();
+      const st = await api.getPlayitStatus();
       setPlayitStatus(st);
+    } catch {}
+
+    try {
+      const hub = await api.getRemoteHubStatus();
+      setRemoteHubStatus(hub);
     } catch {}
   };
 
   useEffect(() => {
     loadStatus();
-    const cleanup = window.electronAPI.onPlayitStatus((status) => {
+    const cleanupPlayit = api.onPlayitStatus((status) => {
       setPlayitStatus(status);
     });
-    return () => cleanup?.();
+    const cleanupHub = api.onRemoteHubStatus((status) => {
+      setRemoteHubStatus(status);
+    });
+
+    return () => {
+      cleanupPlayit?.();
+      cleanupHub?.();
+    };
   }, []);
 
   const copyText = (text: string, id: string) => {
@@ -49,17 +71,38 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleToggleTunnel = async () => {
-    setIsToggling(true);
+  const handleTogglePlayit = async () => {
+    setIsTogglingPlayit(true);
     try {
       if (playitStatus.running) {
-        await window.electronAPI.stopPlayit();
+        await api.stopPlayit();
       } else {
-        await window.electronAPI.startPlayit(server.port);
+        await api.startPlayit(server.port);
       }
       await loadStatus();
     } finally {
-      setIsToggling(false);
+      setIsTogglingPlayit(false);
+    }
+  };
+
+  const handleToggleRemoteHub = async () => {
+    if (!remoteHubStatus) return;
+    setIsTogglingHub(true);
+    try {
+      const updated = await api.updateRemoteHubConfig({ enabled: !remoteHubStatus.enabled });
+      setRemoteHubStatus(updated);
+    } finally {
+      setIsTogglingHub(false);
+    }
+  };
+
+  const handleRegeneratePin = async () => {
+    setIsRegeneratingPin(true);
+    try {
+      const updated = await api.regenerateRemoteHubPin();
+      setRemoteHubStatus(updated);
+    } finally {
+      setIsRegeneratingPin(false);
     }
   };
 
@@ -71,7 +114,178 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6 select-none bg-[#090b10]">
-      {/* 1. Header & Quick Controls */}
+      {/* ================= 1. REMOTE MANAGEMENT HUB ================= */}
+      <div className="bg-[#11141c] rounded-lg border border-zinc-800/80 p-5 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Monitor className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-sm font-semibold text-zinc-100">
+                Remote Management Hub (Friend Control)
+              </h2>
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                  remoteHubStatus?.running
+                    ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+                    : 'bg-zinc-800 text-zinc-500 border border-zinc-700/60'
+                }`}
+              >
+                {remoteHubStatus?.running
+                  ? `Active (Port ${remoteHubStatus.port})`
+                  : 'Disabled'}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400 mt-1 max-w-xl">
+              Let a friend connect to this PC remotely so they can start/stop the server, watch the console, inspect player inventories, and manage server properties while your PC is on.
+            </p>
+          </div>
+
+          <button
+            onClick={handleToggleRemoteHub}
+            disabled={isTogglingHub}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded text-white shadow-xs transition-colors ${
+              remoteHubStatus?.enabled
+                ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+            }`}
+          >
+            <Power className="w-3.5 h-3.5" />
+            <span>{remoteHubStatus?.enabled ? 'Disable Hub' : 'Enable Hub'}</span>
+          </button>
+        </div>
+
+        {remoteHubStatus?.enabled && (
+          <div className="space-y-4 pt-2 border-t border-zinc-800/60">
+            {/* PIN & Connected Clients Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Access PIN Box */}
+              <div className="p-3.5 bg-[#0b0d13] border border-zinc-800 rounded-lg flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold block flex items-center space-x-1">
+                    <Key className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Remote Access PIN</span>
+                  </span>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className="font-mono text-xl font-bold tracking-widest text-emerald-300">
+                      {remoteHubStatus.pin}
+                    </span>
+                    <button
+                      onClick={() => copyText(remoteHubStatus.pin, 'pin')}
+                      className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                      title="Copy PIN"
+                    >
+                      {copiedField === 'pin' ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleRegeneratePin}
+                  disabled={isRegeneratingPin}
+                  className="flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors"
+                  title="Generate a new 6-digit PIN"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRegeneratingPin ? 'animate-spin' : ''}`} />
+                  <span>Regenerate</span>
+                </button>
+              </div>
+
+              {/* Connected Clients */}
+              <div className="p-3.5 bg-[#0b0d13] border border-zinc-800 rounded-lg flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold block flex items-center space-x-1">
+                    <Users className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Connected Remote Friends</span>
+                  </span>
+                  <span className="text-xl font-bold font-mono text-zinc-100 block mt-1">
+                    {remoteHubStatus.connectedClients}{' '}
+                    <span className="text-xs font-normal text-zinc-500">
+                      {remoteHubStatus.connectedClients === 1 ? 'client connected' : 'clients connected'}
+                    </span>
+                  </span>
+                </div>
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    remoteHubStatus.connectedClients > 0
+                      ? 'bg-emerald-500 animate-pulse'
+                      : 'bg-zinc-700'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Connection Links */}
+            <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-lg space-y-3">
+              <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wide block">
+                How to Share with Your Friend
+              </span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                {/* Method 1: Desktop App Connection Code */}
+                <div className="p-3 bg-[#0d0f15] border border-zinc-800 rounded space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-emerald-400">
+                      1. In MC-ForgeDesk (App-to-App)
+                    </span>
+                    <button
+                      onClick={() => copyText(remoteHubStatus.inviteCode, 'invite')}
+                      className="flex items-center space-x-1 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
+                    >
+                      {copiedField === 'invite' ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy Invite Code</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Your friend opens MC-ForgeDesk, clicks <strong>Connect Remote</strong> in the sidebar, and pastes this code:
+                  </p>
+                  <div className="p-1.5 bg-black/50 rounded font-mono text-[11px] text-zinc-200 truncate border border-zinc-800">
+                    {remoteHubStatus.inviteCode}
+                  </div>
+                </div>
+
+                {/* Method 2: Web Browser Dashboard */}
+                <div className="p-3 bg-[#0d0f15] border border-zinc-800 rounded space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-blue-400">
+                      2. In Any Web Browser (No Install)
+                    </span>
+                    <a
+                      href={remoteHubStatus.radminUrl || remoteHubStatus.localUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-1 px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 hover:bg-blue-900 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Open Web View</span>
+                    </a>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    A friend can simply open this link in Chrome, Edge, or Safari and enter PIN <strong className="text-white">{remoteHubStatus.pin}</strong>:
+                  </p>
+                  <div className="p-1.5 bg-black/50 rounded font-mono text-[11px] text-zinc-200 truncate border border-zinc-800">
+                    {remoteHubStatus.radminUrl || remoteHubStatus.localUrl}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ================= 2. PUBLIC TUNNEL (PLAYIT.GG) ================= */}
       <div className="bg-[#11141c] rounded-lg border border-zinc-800/80 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -85,8 +299,8 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
           </div>
 
           <button
-            onClick={handleToggleTunnel}
-            disabled={isToggling}
+            onClick={handleTogglePlayit}
+            disabled={isTogglingPlayit}
             className={`flex items-center space-x-1.5 px-4 py-2 text-xs font-semibold rounded text-white shadow-sm transition-colors ${
               playitStatus.running
                 ? 'bg-rose-600 hover:bg-rose-500'
@@ -108,85 +322,38 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
         </div>
 
         {/* Tunnel Status Card */}
-        <div className="p-4 bg-zinc-900/80 border border-zinc-800 rounded-lg space-y-3">
+        <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-3">
           <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Tunnel Connectivity
+            </span>
             <div className="flex items-center space-x-2">
               <span
                 className={`w-2.5 h-2.5 rounded-full ${
-                  playitStatus.running
-                    ? 'bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50'
-                    : 'bg-zinc-600'
+                  playitStatus.running ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'
                 }`}
               />
-              <span className="text-xs font-bold text-zinc-200 uppercase tracking-wide">
-                {playitStatus.running ? 'Tunnel Active' : 'Tunnel Inactive'}
+              <span className="text-xs font-bold font-mono uppercase text-zinc-300">
+                {playitStatus.running ? 'Active & Tunneling' : 'Tunnel Offline'}
               </span>
             </div>
-            {playitStatus.publicAddress && (
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                Connected
-              </span>
-            )}
           </div>
 
-          {/* Claim Required Notification */}
-          {playitStatus.claimUrl && !playitStatus.publicAddress && (
-            <div className="p-4 bg-amber-950/40 border border-amber-700/70 rounded-lg space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-300">
-                  Account Claim Required to Activate Tunnel
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-700/60">
-                  Step 1 of 1
-                </span>
-              </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                Open this claim link in your browser to link this hoster agent to your free Playit.gg account and assign your public <span className="font-mono text-emerald-400">.joinmc.link</span> address.
-              </p>
-              <div className="flex items-center space-x-2 pt-1">
-                <button
-                  onClick={openClaimUrl}
-                  className="flex items-center space-x-1.5 px-4 py-2 text-xs font-bold rounded bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-colors shadow-sm"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Open Claim URL in Browser</span>
-                </button>
-                <button
-                  onClick={() => copyText(playitStatus.claimUrl!, 'claimLink')}
-                  className="flex items-center space-x-1 px-3 py-2 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
-                >
-                  {copiedField === 'claimLink' ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy URL</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Assigned Domain */}
           {playitStatus.publicAddress ? (
-            <div className="p-3 bg-zinc-950/80 border border-emerald-500/40 rounded flex items-center justify-between">
+            <div className="p-3 bg-emerald-950/40 border border-emerald-800/70 rounded flex items-center justify-between">
               <div>
-                <span className="text-[11px] text-zinc-400 block font-medium">
-                  Public Join Address (Give this to your friends):
+                <span className="text-[11px] uppercase tracking-wider text-emerald-400 font-semibold block">
+                  Public Minecraft Join Address:
                 </span>
-                <span className="text-base font-mono font-bold text-emerald-400">
+                <span className="font-mono text-emerald-300 font-bold text-sm block mt-0.5">
                   {playitStatus.publicAddress}
                 </span>
               </div>
               <button
-                onClick={() => copyText(playitStatus.publicAddress!, 'playitAddr')}
-                className="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                onClick={() => copyText(playitStatus.publicAddress!, 'tunnel')}
+                className="flex items-center space-x-1 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shadow-sm"
               >
-                {copiedField === 'playitAddr' ? (
+                {copiedField === 'tunnel' ? (
                   <>
                     <Check className="w-3.5 h-3.5" />
                     <span>Copied!</span>
@@ -194,9 +361,27 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Link</span>
+                    <span>Copy Join Address</span>
                   </>
                 )}
+              </button>
+            </div>
+          ) : playitStatus.claimUrl ? (
+            <div className="p-3 bg-purple-950/40 border border-purple-800/70 rounded flex items-center justify-between">
+              <div>
+                <span className="text-purple-300 font-semibold block text-xs">
+                  Account Claim Link Required
+                </span>
+                <span className="text-[11px] text-zinc-400 block mt-0.5">
+                  Link this server runner to your free Playit.gg account to generate permanent tunnels.
+                </span>
+              </div>
+              <button
+                onClick={openClaimUrl}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-colors shadow-sm"
+              >
+                <span>Claim Account</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : playitStatus.running && !playitStatus.claimUrl ? (
@@ -237,7 +422,7 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
         )}
       </div>
 
-      {/* 2. Direct Network & Radmin VPN */}
+      {/* ================= 3. DIRECT NETWORK & RADMIN VPN ================= */}
       <div className="bg-[#11141c] rounded-lg border border-zinc-800/80 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-zinc-200 uppercase tracking-wide flex items-center space-x-2">
@@ -331,28 +516,6 @@ export const NetworkTunnel: React.FC<NetworkTunnelProps> = ({ server, localIp, r
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 3. Safety & Networking FAQ Card */}
-      <div className="bg-[#11141c] rounded-lg border border-zinc-800/80 p-5 space-y-3">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-300 uppercase tracking-wide">
-          <Shield className="w-4 h-4 text-emerald-400" />
-          <span>How Someone Connects (Radmin vs Public Tunnel)</span>
-        </div>
-        <ul className="text-xs text-zinc-400 space-y-2.5 list-disc list-inside leading-relaxed">
-          <li>
-            <strong className="text-emerald-400">Option 1: Radmin VPN (Zero Tunneling Needed):</strong> If both you and your friends use Radmin VPN, have them join your Radmin network room. In Minecraft, they enter your Radmin IP: <code className="text-emerald-300 font-mono">{radminIp || '26.x.x.x'}:{server.port}</code>. That&apos;s all!
-          </li>
-          <li>
-            <strong className="text-zinc-200">Option 2: Public Tunnel (Playit.gg):</strong> If your friends don&apos;t want to install Radmin VPN, click &quot;Start Public Tunnel&quot; above. Give them your public <code className="text-emerald-400 font-mono">*.joinmc.link</code> address. They can join over the internet with zero software installed.
-          </li>
-          <li>
-            <strong className="text-zinc-200">Playing on This Machine:</strong> If you are playing on the same computer hosting the server, enter <code className="text-zinc-200 font-mono">127.0.0.1</code> or <code className="text-zinc-200 font-mono">localhost</code> in Minecraft.
-          </li>
-          <li>
-            <strong className="text-zinc-200">Instant TLauncher / Offline Support:</strong> If your server has Offline mode enabled, players using any Minecraft launcher can join using either the Radmin IP or the public link directly.
-          </li>
-        </ul>
       </div>
     </div>
   );

@@ -9,8 +9,13 @@ import {
   ExternalLink,
   CheckCircle,
   AlertCircle,
+  Globe,
+  Key,
+  Copy,
+  Check,
 } from 'lucide-react';
-import { SystemInfo } from '../types';
+import { SystemInfo, RemoteHubStatus } from '../types';
+import { api } from '../services/apiBridge';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -19,13 +24,24 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null);
+  const [remoteHub, setRemoteHub] = useState<RemoteHubStatus | null>(null);
+  const [copiedPin, setCopiedPin] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.electronAPI?.getSystemInfo().then(setSysInfo);
+    api.getSystemInfo().then(setSysInfo).catch(() => {});
+    api.getRemoteHubStatus().then(setRemoteHub).catch(() => {});
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleCopyPin = () => {
+    if (remoteHub?.pin) {
+      navigator.clipboard.writeText(remoteHub.pin);
+      setCopiedPin(true);
+      setTimeout(() => setCopiedPin(false), 2000);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-xs select-none">
@@ -158,6 +174,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <span>~/MC-ForgeDesk/servers/</span>
             </div>
           </div>
+
+          {/* 4. Remote Management Hub Summary */}
+          {remoteHub && (
+            <div className="p-4 bg-[#11141c] rounded-lg border border-zinc-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-zinc-200 uppercase tracking-wide flex items-center space-x-2">
+                  <Globe className="w-4 h-4 text-emerald-400" />
+                  <span>Remote Node Management</span>
+                </h3>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                    remoteHub.running
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+                      : 'bg-zinc-800 text-zinc-500 border border-zinc-700/60'
+                  }`}
+                >
+                  {remoteHub.running ? `Online (Port ${remoteHub.port})` : 'Offline'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-zinc-400">
+                <div>
+                  <span className="text-zinc-500 block">Access PIN:</span>
+                  <div className="flex items-center space-x-2 mt-0.5">
+                    <span className="font-mono text-emerald-300 font-bold tracking-wider">
+                      {remoteHub.pin}
+                    </span>
+                    <button
+                      onClick={handleCopyPin}
+                      className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                      title="Copy PIN"
+                    >
+                      {copiedPin ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-zinc-500 block">Connected Friends:</span>
+                  <span className="font-mono text-zinc-200 font-semibold mt-0.5 block">
+                    {remoteHub.connectedClients} active clients
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
